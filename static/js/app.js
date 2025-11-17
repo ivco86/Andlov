@@ -766,6 +766,118 @@ async function mergeBoards(sourceBoardId, targetBoardId, deleteSource = true) {
     }
 }
 
+async function suggestBoardsForImage(imageId) {
+    try {
+        const image = state.currentImage || state.images.find(img => img.id === imageId);
+
+        if (!image) {
+            showToast('Image not found', 'error');
+            return;
+        }
+
+        if (!image.analyzed_at) {
+            showToast('Please analyze the image first before getting board suggestions', 'warning');
+            return;
+        }
+
+        showToast('🤖 AI is analyzing boards...', 'info');
+
+        const data = await apiCall(`/images/${imageId}/suggest-boards`, {
+            method: 'POST'
+        });
+
+        if (data.success && data.suggestion) {
+            const suggestion = data.suggestion;
+
+            if (suggestion.action === 'add_to_existing') {
+                // AI suggests adding to existing boards
+                const boardNames = suggestion.suggested_boards
+                    .map(boardId => {
+                        const board = findBoardById(boardId, state.boards);
+                        return board ? board.name : `Board #${boardId}`;
+                    })
+                    .join(', ');
+
+                const confidence = (suggestion.confidence * 100).toFixed(0);
+
+                showToast(
+                    `🤖 AI Suggestion (${confidence}% confident): Add to "${boardNames}". ${suggestion.reasoning}`,
+                    'success',
+                    8000
+                );
+
+                // Auto-select suggested boards if user confirms
+                if (confirm(`AI suggests adding this image to: ${boardNames}\n\nReason: ${suggestion.reasoning}\n\nWould you like to open the board selector with these pre-selected?`)) {
+                    // Open add to board modal with pre-selection
+                    await openAddToBoardModalWithSuggestions(suggestion.suggested_boards);
+                }
+
+            } else if (suggestion.action === 'create_new') {
+                // AI suggests creating a new board
+                const newBoard = suggestion.new_board;
+                const confidence = (suggestion.confidence * 100).toFixed(0);
+
+                showToast(
+                    `🤖 AI Suggestion (${confidence}% confident): Create new board "${newBoard.name}". ${suggestion.reasoning}`,
+                    'success',
+                    8000
+                );
+
+                // Ask user if they want to create the suggested board
+                if (confirm(`AI suggests creating a new board:\n\nName: ${newBoard.name}\nDescription: ${newBoard.description}\n\nReason: ${suggestion.reasoning}\n\nWould you like to create this board and add the image to it?`)) {
+                    // Create the board
+                    const boardId = await createBoard(newBoard.name, newBoard.description, null);
+
+                    if (boardId) {
+                        // Add image to the newly created board
+                        const added = await addImageToBoard(boardId, imageId);
+
+                        if (added) {
+                            showToast('✅ Board created and image added!', 'success');
+
+                            // Refresh current image details
+                            const refreshedImage = await getImageDetails(imageId);
+                            if (refreshedImage) {
+                                state.currentImage = refreshedImage;
+                                updateModal();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        showToast('Failed to get board suggestions: ' + error.message, 'error');
+    }
+}
+
+async function openAddToBoardModalWithSuggestions(suggestedBoardIds) {
+    await openAddToBoardModal();
+
+    // Pre-select the suggested boards
+    setTimeout(() => {
+        suggestedBoardIds.forEach(boardId => {
+            const checkbox = document.querySelector(`#boardSelection input[value="${boardId}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+        });
+    }, 100);
+}
+
+function findBoardById(boardId, boards) {
+    for (const board of boards) {
+        if (board.id === boardId) {
+            return board;
+        }
+        if (board.sub_boards && board.sub_boards.length > 0) {
+            const found = findBoardById(boardId, board.sub_boards);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
 async function getImageDetails(imageId) {
     try {
         const data = await apiCall(`/images/${imageId}`);
@@ -1198,6 +1310,9 @@ function updateModal() {
                     <button class="action-btn secondary" onclick="openAddToBoardModal()">
                         📋 Boards
                     </button>
+                    ${image.analyzed_at ? `<button class="action-btn secondary" onclick="suggestBoardsForImage(${image.id})">
+                        🤖 Suggest Boards
+                    </button>` : ''}
                     <button class="action-btn secondary" onclick="showOpenWithMenu(event, ${image.id}, '${image.media_type || 'image'}')">
                         🚀 Open With
                     </button>

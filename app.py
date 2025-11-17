@@ -957,6 +957,57 @@ def analyze_image(image_id):
             except Exception as e:
                 print(f"[ANALYZE] Warning: Could not delete temp file {temp_image_path}: {e}")
 
+@app.route('/api/images/<int:image_id>/suggest-boards', methods=['POST'])
+def suggest_boards_for_image(image_id):
+    """Get AI suggestions for which boards this image should belong to"""
+    try:
+        # Get the image
+        image = db.get_image(image_id)
+        if not image:
+            return jsonify({'error': 'Image not found'}), 404
+
+        # Check if image has been analyzed
+        if not image.get('description') and not image.get('tags'):
+            return jsonify({
+                'error': 'Image must be analyzed first before getting board suggestions'
+            }), 400
+
+        # Check AI connection
+        connected, message = ai.check_connection()
+        if not connected:
+            return jsonify({'error': f'AI not available: {message}'}), 503
+
+        # Get image description and tags
+        description = image.get('description', '')
+        tags = []
+        if image.get('tags'):
+            try:
+                tags = json.loads(image['tags'])
+            except:
+                tags = []
+
+        # Get all existing boards
+        all_boards = db.get_all_boards()
+
+        # Request board suggestions from AI
+        print(f"[SUGGEST-BOARDS] Requesting AI suggestions for image {image_id}...")
+        suggestion = ai.suggest_boards(description, tags, all_boards)
+
+        if suggestion:
+            print(f"[SUGGEST-BOARDS] AI suggestion: {suggestion['action']}")
+            return jsonify({
+                'success': True,
+                'suggestion': suggestion
+            })
+        else:
+            return jsonify({'error': 'AI could not generate board suggestions'}), 500
+
+    except Exception as e:
+        print(f"Error getting board suggestions for image {image_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Suggestion error: {str(e)}'}), 500
+
 @app.route('/api/images/<int:image_id>/similar', methods=['GET'])
 def get_similar_images(image_id):
     """Get similar images based on shared tags"""

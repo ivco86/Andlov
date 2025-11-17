@@ -441,12 +441,147 @@ CRITICAL INSTRUCTIONS:
         """
         results = {}
         total = len(image_paths)
-        
+
         for i, path in enumerate(image_paths):
             if progress_callback:
                 progress_callback(i + 1, total, path)
-            
+
             result = self.analyze_image(path)
             results[path] = result
-        
+
         return results
+
+    def suggest_boards(self, image_description: str, image_tags: list,
+                       existing_boards: list) -> Optional[Dict]:
+        """
+        Suggest which board(s) an image should belong to based on its description and tags.
+        Can also suggest creating a new board.
+
+        Args:
+            image_description: The AI-generated description of the image
+            image_tags: List of tags for the image
+            existing_boards: List of dicts with 'id', 'name', and 'description' of existing boards
+
+        Returns:
+            {
+                'action': 'add_to_existing' or 'create_new',
+                'suggested_boards': [board_id1, board_id2, ...],  # if action is 'add_to_existing'
+                'confidence': 0.0-1.0,  # how confident AI is about the suggestion
+                'new_board': {  # if action is 'create_new'
+                    'name': 'suggested name',
+                    'description': 'suggested description'
+                },
+                'reasoning': 'explanation of why these boards were suggested'
+            }
+        """
+        try:
+            # Prepare board information for the AI
+            boards_info = []
+            for board in existing_boards:
+                board_text = f"ID: {board['id']}, Name: '{board['name']}'"
+                if board.get('description'):
+                    board_text += f", Description: '{board['description']}'"
+                boards_info.append(board_text)
+
+            boards_context = "\n".join(boards_info) if boards_info else "No existing boards"
+            tags_text = ", ".join(image_tags) if image_tags else "No tags"
+
+            # Create the prompt
+            prompt = f"""You are helping organize a photo gallery. Based on an image's description and tags, suggest which board(s) it should be added to, or if a new board should be created.
+
+IMAGE INFORMATION:
+Description: {image_description}
+Tags: {tags_text}
+
+EXISTING BOARDS:
+{boards_context}
+
+TASK:
+Analyze the image information and existing boards. Then decide:
+1. If the image fits well into one or more existing boards → suggest those boards
+2. If no existing board is a good match → suggest creating a new board with an appropriate name and description
+
+You must respond with ONLY a valid JSON object in this exact format:
+{{
+  "action": "add_to_existing" or "create_new",
+  "suggested_boards": [1, 2, 3],
+  "confidence": 0.85,
+  "new_board": {{
+    "name": "New Board Name",
+    "description": "Description for the new board"
+  }},
+  "reasoning": "Brief explanation of your suggestion"
+}}
+
+RULES:
+- If action is "add_to_existing", include board IDs in suggested_boards array and set new_board to null
+- If action is "create_new", set suggested_boards to empty array and provide new_board details
+- Confidence should be 0.0 to 1.0 (0.8+ means very confident, 0.5-0.7 means moderate, below 0.5 means uncertain)
+- Keep reasoning brief (1-2 sentences)
+- Only suggest boards that are truly relevant
+- If unsure, prefer creating a new board rather than forcing image into irrelevant board
+
+CRITICAL INSTRUCTIONS:
+- Your ENTIRE response must be ONLY the JSON object
+- Do NOT add explanations before or after the JSON
+- Do NOT use markdown code blocks
+- Just the raw JSON object and nothing else"""
+
+            # Send request to LM Studio (text-only, no image needed)
+            payload = {
+                "model": "llava",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "max_tokens": 300,
+                "temperature": 0.5  # Lower temperature for more consistent suggestions
+            }
+
+            print(f"Requesting board suggestions from LM Studio...")
+
+            response = requests.post(
+                self.api_endpoint,
+                json=payload,
+                timeout=60
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+
+                if 'choices' not in result or len(result['choices']) == 0:
+                    print(f"Invalid response structure: {result}")
+                    return None
+
+                content = result['choices'][0]['message']['content']
+                print(f"AI board suggestion response: {content[:200]}...")
+
+                # Parse JSON response
+                parsed = self._extract_json(content)
+
+                if parsed:
+                    # Validate and clean up response
+                    suggestion = {
+                        'action': parsed.get('action', 'create_new'),
+                        'suggested_boards': parsed.get('suggested_boards', []),
+                        'confidence': float(parsed.get('confidence', 0.5)),
+                        'new_board': parsed.get('new_board'),
+                        'reasoning': parsed.get('reasoning', '')
+                    }
+
+                    print(f"Board suggestion: {suggestion['action']} (confidence: {suggestion['confidence']})")
+                    return suggestion
+                else:
+                    print("Warning: Could not parse JSON response for board suggestion")
+                    return None
+            else:
+                print(f"LM Studio error: {response.status_code} - {response.text}")
+                return None
+
+        except Exception as e:
+            print(f"Error suggesting boards: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
