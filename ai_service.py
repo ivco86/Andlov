@@ -6,11 +6,31 @@ Handles communication with local LM Studio API
 import requests
 import base64
 import json
+import logging
 from typing import Dict, Tuple, Optional
 from pathlib import Path
 
+# Configure logger
+logger = logging.getLogger(__name__)
+
 
 class AIService:
+    # Common JSON format instructions used across all prompts
+    CRITICAL_JSON_INSTRUCTIONS = """
+You must respond with ONLY a valid JSON object in this exact format:
+{
+  "description": "your description here",
+  "tags": ["tag1", "tag2", "tag3"],
+  "suggested_filename": "descriptive_filename_here"
+}
+
+CRITICAL INSTRUCTIONS:
+- Your ENTIRE response must be ONLY the JSON object above
+- Do NOT add any explanations before or after the JSON
+- Do NOT use markdown code blocks (no ```json```)
+- Do NOT add any commentary or additional text
+- Just the raw JSON object and nothing else
+- Ensure the JSON is valid with no trailing commas or syntax errors"""
     def __init__(self, lm_studio_url: str = "http://localhost:1234"):
         self.lm_studio_url = lm_studio_url
         self.api_endpoint = f"{lm_studio_url}/v1/chat/completions"
@@ -35,20 +55,6 @@ class AIService:
    - Colors if prominent (monochrome, colorful, blue_tones, etc.)
 3. A suggested filename (descriptive, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
-You must respond with ONLY a valid JSON object in this exact format:
-{
-  "description": "your detailed description here",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "suggested_filename": "descriptive_filename_here"
-}
-
-CRITICAL INSTRUCTIONS:
-- Your ENTIRE response must be ONLY the JSON object above
-- Do NOT add any explanations before or after the JSON
-- Do NOT use markdown code blocks (no ```json```)
-- Do NOT add any commentary or additional text
-- Just the raw JSON object and nothing else
-
 Guidelines for description:
 - Be specific about art style (very important!) - is it a photo, comic art, illustration, digital art, painting?
 - Include notable details like tattoos, piercings, unique clothing, weapons, etc.
@@ -69,9 +75,7 @@ Guidelines for filename:
 - Use underscores instead of spaces
 - Keep it descriptive but under 50 chars
 - Do NOT include file extension
-- Example: "woman_with_sword_comic_style" not just "woman_with_sword"
-
-Ensure the JSON is valid with no trailing commas or syntax errors"""
+- Example: "woman_with_sword_comic_style" not just "woman_with_sword\""""
             },
 
             'artistic': {
@@ -92,20 +96,6 @@ Ensure the JSON is valid with no trailing commas or syntax errors"""
    - Technical and artistic aspects
 3. A suggested filename (descriptive, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
-You must respond with ONLY a valid JSON object in this exact format:
-{
-  "description": "your detailed artistic description here",
-  "tags": ["tag1", "tag2", "tag3"],
-  "suggested_filename": "descriptive_filename_here"
-}
-
-CRITICAL INSTRUCTIONS:
-- Your ENTIRE response must be ONLY the JSON object above
-- Do NOT add any explanations before or after the JSON
-- Do NOT use markdown code blocks (no ```json```)
-- Do NOT add any commentary or additional text
-- Just the raw JSON object and nothing else
-
 Guidelines:
 - ALWAYS identify and mention the art style/medium in description
 - Make the description rich, detailed, and atmospheric
@@ -116,8 +106,7 @@ Guidelines:
 - Ensure they are unique and relevant
 - Filename should be descriptive but concise
 - Use underscores instead of spaces in filename
-- Do NOT include file extension in suggested_filename
-- Ensure the JSON is valid with no trailing commas or syntax errors"""
+- Do NOT include file extension in suggested_filename"""
             },
 
             'spicy': {
@@ -136,20 +125,6 @@ Guidelines:
    - Visual characteristics
 3. A suggested filename (descriptive, evocative, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
-You must respond with ONLY a valid JSON object in this exact format:
-{
-  "description": "your bold description here",
-  "tags": ["tag1", "tag2", "tag3"],
-  "suggested_filename": "descriptive_filename_here"
-}
-
-CRITICAL INSTRUCTIONS:
-- Your ENTIRE response must be ONLY the JSON object above
-- Do NOT add any explanations before or after the JSON
-- Do NOT use markdown code blocks (no ```json```)
-- Do NOT add any commentary or additional text
-- Just the raw JSON object and nothing else
-
 Guidelines:
 - ALWAYS identify art style/medium first (comic, photo, illustration, etc.)
 - Make the description bold, captivating, and more provocative with sensual, tantalizing language to heighten allure and intensity
@@ -161,8 +136,7 @@ Guidelines:
 - Ensure they are unique and relevant
 - Filename should be descriptive but concise
 - Use underscores instead of spaces in filename
-- Do NOT include file extension in suggested_filename
-- Ensure the JSON is valid with no trailing commas or syntax errors"""
+- Do NOT include file extension in suggested_filename"""
             },
 
             'social': {
@@ -181,20 +155,6 @@ Guidelines:
    - Trending and relevant keywords
 3. A suggested filename (catchy, descriptive, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
-You must respond with ONLY a valid JSON object in this exact format:
-{
-  "description": "your social media description here",
-  "tags": ["#hashtag1", "#hashtag2", "keyword1"],
-  "suggested_filename": "descriptive_filename_here"
-}
-
-CRITICAL INSTRUCTIONS:
-- Your ENTIRE response must be ONLY the JSON object above
-- Do NOT add any explanations before or after the JSON
-- Do NOT use markdown code blocks (no ```json```)
-- Do NOT add any commentary or additional text
-- Just the raw JSON object and nothing else
-
 Guidelines:
 - Naturally mention art style in description (e.g., "This stunning comic art shows...")
 - Write in a friendly, conversational tone
@@ -205,8 +165,7 @@ Guidelines:
 - Consider what would perform well on social platforms
 - Filename should be descriptive but concise
 - Use underscores instead of spaces in filename
-- Do NOT include file extension in suggested_filename
-- Ensure the JSON is valid with no trailing commas or syntax errors"""
+- Do NOT include file extension in suggested_filename"""
             },
 
             'tags': {
@@ -214,22 +173,10 @@ Guidelines:
                 'description': 'Generate only tags/keywords without description',
                 'prompt': """Analyze this image and provide ONLY comprehensive tags/keywords.
 
-You must respond with ONLY a valid JSON object in this exact format:
-{
-  "description": "",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8", "tag9", "tag10"],
-  "suggested_filename": ""
-}
-
-CRITICAL INSTRUCTIONS:
-- Your ENTIRE response must be ONLY the JSON object above
+SPECIAL INSTRUCTIONS:
 - Generate 10-15 relevant, descriptive tags/keywords for this image
 - Leave description empty (empty string "")
 - Leave suggested_filename empty (empty string "")
-- Do NOT add any explanations before or after the JSON
-- Do NOT use markdown code blocks (no ```json```)
-- Do NOT add any commentary or additional text
-- Just the raw JSON object and nothing else
 
 Guidelines for tags - MUST include:
 1. Art style (comic, illustration, photo, cartoon, anime, painted, digital_art, etc.) - REQUIRED as first tags
@@ -246,8 +193,7 @@ Format rules:
 - Include specific details like tattoos, weapons, clothing style, etc.
 - Ensure tags are unique and highly relevant
 - No hashtags (#) - just plain keywords
-- Aim for 10-15 comprehensive tags
-- Ensure the JSON is valid with no trailing commas or syntax errors"""
+- Aim for 10-15 comprehensive tags"""
             },
 
             'custom': {
@@ -314,29 +260,14 @@ Format rules:
             # Get prompt based on style
             if style == 'custom' and custom_prompt:
                 # Wrap custom prompt with JSON instructions
-                prompt = f"""{custom_prompt}
-
-You must respond with ONLY a valid JSON object in this exact format:
-{{
-  "description": "your description here",
-  "tags": ["tag1", "tag2", "tag3"],
-  "suggested_filename": "descriptive_filename_here"
-}}
-
-CRITICAL INSTRUCTIONS:
-- Your ENTIRE response must be ONLY the JSON object above
-- Do NOT add any explanations before or after the JSON
-- Do NOT use markdown code blocks (no ```json```)
-- Do NOT add any commentary or additional text
-- Just the raw JSON object and nothing else
-- Ensure the JSON is valid with no trailing commas or syntax errors"""
+                prompt = f"{custom_prompt}\n\n{self.CRITICAL_JSON_INSTRUCTIONS}"
             elif style in self.prompts:
-                prompt = self.prompts[style]['prompt']
+                prompt = f"{self.prompts[style]['prompt']}\n\n{self.CRITICAL_JSON_INSTRUCTIONS}"
             else:
                 # Fallback to classic
-                prompt = self.prompts['classic']['prompt']
+                prompt = f"{self.prompts['classic']['prompt']}\n\n{self.CRITICAL_JSON_INSTRUCTIONS}"
 
-            print(f"Using '{style}' style for analysis")
+            logger.info("Using '%s' style for analysis", style)
 
             # Prepare API request
             payload = {
@@ -362,65 +293,63 @@ CRITICAL INSTRUCTIONS:
                 "temperature": 0.7
             }
             
-            print(f"Sending analysis request to {self.api_endpoint}")
-            
+            logger.debug("Sending analysis request to %s", self.api_endpoint)
+
             # Send request to LM Studio
             response = requests.post(
                 self.api_endpoint,
                 json=payload,
                 timeout=120  # 2 minutes timeout for slow models
             )
-            
-            print(f"Response status: {response.status_code}")
-            
+
+            logger.debug("Response status: %d", response.status_code)
+
             if response.status_code == 200:
                 result = response.json()
-                
+
                 # Extract content from response
                 if 'choices' not in result or len(result['choices']) == 0:
-                    print(f"Invalid response structure: {result}")
+                    logger.error("Invalid response structure from LM Studio")
                     return None
-                
+
                 content = result['choices'][0]['message']['content']
-                print(f"AI response: {content[:200]}...")
-                
+                logger.debug("AI response (truncated): %s...", content[:200])
+
                 # Try to parse JSON from content
                 parsed = self._extract_json(content)
-                
+
                 if parsed:
                     result = {
                         'description': parsed.get('description', ''),
                         'tags': parsed.get('tags', []),
                         'suggested_filename': parsed.get('suggested_filename', '')
                     }
-                    print(f"AI suggested filename: {result.get('suggested_filename', 'none')}")
+                    logger.info("AI suggested filename: %s", result.get('suggested_filename', 'none'))
                     return result
                 else:
                     # Fallback: treat whole response as description
-                    print("Warning: Could not parse JSON, using raw response")
+                    logger.warning("Could not parse JSON from AI response, using raw response as description")
                     return {
                         'description': content.strip(),
                         'tags': [],
-                        'suggested_filename': ''
+                        'suggested_filename': '',
+                        'warning': 'AI did not return valid JSON. The raw response is in "description".'
                     }
             else:
-                print(f"LM Studio error: {response.status_code} - {response.text}")
+                logger.error("LM Studio error: %d - %s", response.status_code, response.text)
                 return None
-                
+
         except FileNotFoundError:
-            print(f"Image file not found: {image_path}")
+            logger.error("Image file not found: %s", image_path)
             return None
         except requests.exceptions.ConnectionError as e:
-            print(f"Connection error: {str(e)}")
-            print("Make sure LM Studio is running with local server enabled")
+            logger.error("Connection error: %s. Make sure LM Studio is running with local server enabled", str(e))
             return None
         except requests.exceptions.Timeout:
-            print(f"Analysis timed out for {image_path}")
+            logger.error("Analysis timed out for %s", image_path)
             return None
         except Exception as e:
-            print(f"Error analyzing image: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error analyzing image: %s", str(e), exc_info=True)
             return None
     
     def _extract_json(self, text: str) -> Optional[Dict]:
@@ -429,14 +358,28 @@ CRITICAL INSTRUCTIONS:
         Handles cases where AI returns JSON followed by additional explanation.
         """
         import re
-        
+
         # Try direct parse first (if text is pure JSON)
         text = text.strip()
         try:
             return json.loads(text)
         except:
             pass
-        
+
+        # Simple approach: find first { and last } - covers most common cases
+        # This is fast and handles cases where AI adds comments after JSON
+        start_idx = text.find('{')
+        end_idx = text.rfind('}')
+
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_str = text[start_idx : end_idx + 1]
+            try:
+                parsed = json.loads(json_str)
+                logger.debug("Successfully extracted JSON using find/rfind method")
+                return parsed
+            except:
+                pass
+
         # Look for ```json ... ``` markdown code blocks
         json_match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
         if json_match:
@@ -444,7 +387,7 @@ CRITICAL INSTRUCTIONS:
                 return json.loads(json_match.group(1))
             except:
                 pass
-        
+
         # Look for properly nested JSON {...} block
         # This regex handles nested objects correctly
         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
@@ -453,36 +396,36 @@ CRITICAL INSTRUCTIONS:
                 return json.loads(json_match.group(0))
             except:
                 pass
-        
+
         # Last resort: Manual brace counting to extract complete JSON
-        # This handles deeply nested structures
+        # This handles deeply nested structures with proper escaping
         try:
             start_idx = text.find('{')
             if start_idx == -1:
                 return None
-            
+
             brace_count = 0
             end_idx = start_idx
             in_string = False
             escape_next = False
-            
+
             for i in range(start_idx, len(text)):
                 char = text[i]
-                
+
                 # Handle string escaping
                 if escape_next:
                     escape_next = False
                     continue
-                
+
                 if char == '\\':
                     escape_next = True
                     continue
-                
+
                 # Track if we're inside a string
                 if char == '"':
                     in_string = not in_string
                     continue
-                
+
                 # Only count braces outside of strings
                 if not in_string:
                     if char == '{':
@@ -492,17 +435,17 @@ CRITICAL INSTRUCTIONS:
                         if brace_count == 0:
                             end_idx = i + 1
                             break
-            
+
             if end_idx > start_idx:
                 json_str = text[start_idx:end_idx]
                 parsed = json.loads(json_str)
-                print(f"Successfully extracted JSON using brace counting")
+                logger.debug("Successfully extracted JSON using brace counting")
                 return parsed
         except Exception as e:
-            print(f"Brace counting extraction failed: {str(e)}")
+            logger.debug("Brace counting extraction failed: %s", str(e))
             pass
-        
-        print(f"Warning: Could not extract valid JSON from response")
+
+        logger.warning("Could not extract valid JSON from AI response")
         return None
     
     def batch_analyze(self, image_paths: list, progress_callback=None) -> Dict[str, Dict]:
@@ -635,7 +578,7 @@ CRITICAL INSTRUCTIONS:
                 "temperature": 0.5  # Lower temperature for more consistent suggestions
             }
 
-            print(f"Requesting board suggestions from LM Studio...")
+            logger.debug("Requesting board suggestions from LM Studio...")
 
             response = requests.post(
                 self.api_endpoint,
@@ -647,11 +590,11 @@ CRITICAL INSTRUCTIONS:
                 result = response.json()
 
                 if 'choices' not in result or len(result['choices']) == 0:
-                    print(f"Invalid response structure: {result}")
+                    logger.error("Invalid response structure from LM Studio for board suggestion")
                     return None
 
                 content = result['choices'][0]['message']['content']
-                print(f"AI board suggestion response: {content[:200]}...")
+                logger.debug("AI board suggestion response (truncated): %s...", content[:200])
 
                 # Parse JSON response
                 parsed = self._extract_json(content)
@@ -666,17 +609,15 @@ CRITICAL INSTRUCTIONS:
                         'reasoning': parsed.get('reasoning', '')
                     }
 
-                    print(f"Board suggestion: {suggestion['action']} (confidence: {suggestion['confidence']})")
+                    logger.info("Board suggestion: %s (confidence: %.2f)", suggestion['action'], suggestion['confidence'])
                     return suggestion
                 else:
-                    print("Warning: Could not parse JSON response for board suggestion")
+                    logger.warning("Could not parse JSON response for board suggestion")
                     return None
             else:
-                print(f"LM Studio error: {response.status_code} - {response.text}")
+                logger.error("LM Studio error for board suggestion: %d - %s", response.status_code, response.text)
                 return None
 
         except Exception as e:
-            print(f"Error suggesting boards: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error suggesting boards: %s", str(e), exc_info=True)
             return None
