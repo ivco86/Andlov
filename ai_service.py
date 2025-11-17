@@ -475,31 +475,53 @@ CRITICAL INSTRUCTIONS:
             }
         """
         try:
-            # Prepare board information for the AI
-            boards_info = []
-            for board in existing_boards:
-                board_text = f"ID: {board['id']}, Name: '{board['name']}'"
+            # Prepare board information with hierarchy for the AI
+            def format_board_hierarchy(board, indent=0):
+                prefix = "  " * indent
+                board_text = f"{prefix}ID: {board['id']}, Name: '{board['name']}'"
                 if board.get('description'):
                     board_text += f", Description: '{board['description']}'"
-                boards_info.append(board_text)
+                if board.get('parent_id'):
+                    board_text += f" [Sub-board of ID: {board['parent_id']}]"
+
+                result = [board_text]
+
+                # Add sub-boards recursively
+                if board.get('sub_boards'):
+                    for sub_board in board['sub_boards']:
+                        result.extend(format_board_hierarchy(sub_board, indent + 1))
+
+                return result
+
+            boards_info = []
+            for board in existing_boards:
+                if not board.get('parent_id'):  # Only process top-level boards
+                    boards_info.extend(format_board_hierarchy(board))
 
             boards_context = "\n".join(boards_info) if boards_info else "No existing boards"
             tags_text = ", ".join(image_tags) if image_tags else "No tags"
 
-            # Create the prompt
+            # Create the prompt with hierarchy awareness
             prompt = f"""You are helping organize a photo gallery. Based on an image's description and tags, suggest which board(s) it should be added to, or if a new board should be created.
 
 IMAGE INFORMATION:
 Description: {image_description}
 Tags: {tags_text}
 
-EXISTING BOARDS:
+EXISTING BOARDS (with hierarchy):
 {boards_context}
 
 TASK:
 Analyze the image information and existing boards. Then decide:
 1. If the image fits well into one or more existing boards → suggest those boards
-2. If no existing board is a good match → suggest creating a new board with an appropriate name and description
+2. If the image is a specific subcategory of an existing board → suggest creating a sub-board under that parent
+3. If no existing board is a good match → suggest creating a new top-level board
+
+IMPORTANT - HIERARCHY RULES:
+- If the image fits a GENERAL category that exists (e.g., "Women", "Nature", "Cars"), consider creating a SUB-BOARD for the SPECIFIC aspect (e.g., "Women with Tattoos" under "Women")
+- Example: If board "Women" exists and image shows "woman with tattoos" → create sub-board "Tattoos" with parent_id of "Women" board
+- Example: If board "Nature" exists and image shows "sunset over ocean" → create sub-board "Sunsets" under "Nature"
+- Only create top-level boards for entirely new categories
 
 You must respond with ONLY a valid JSON object in this exact format:
 {{
@@ -508,18 +530,20 @@ You must respond with ONLY a valid JSON object in this exact format:
   "confidence": 0.85,
   "new_board": {{
     "name": "New Board Name",
-    "description": "Description for the new board"
+    "description": "Description for the new board",
+    "parent_id": null or 123
   }},
   "reasoning": "Brief explanation of your suggestion"
 }}
 
 RULES:
 - If action is "add_to_existing", include board IDs in suggested_boards array and set new_board to null
-- If action is "create_new", set suggested_boards to empty array and provide new_board details
+- If action is "create_new", provide new_board details with parent_id (use parent board's ID if creating sub-board, or null for top-level)
 - Confidence should be 0.0 to 1.0 (0.8+ means very confident, 0.5-0.7 means moderate, below 0.5 means uncertain)
 - Keep reasoning brief (1-2 sentences)
 - Only suggest boards that are truly relevant
-- If unsure, prefer creating a new board rather than forcing image into irrelevant board
+- PREFER creating sub-boards when a general parent category exists
+- new_board.name should be the SUB-CATEGORY name only (e.g., "Tattoos" not "Women with Tattoos" if parent is "Women")
 
 CRITICAL INSTRUCTIONS:
 - Your ENTIRE response must be ONLY the JSON object

@@ -323,18 +323,163 @@ async function analyzeImage(imageId, style = null, customPrompt = null) {
         if (state.currentImage && state.currentImage.id === imageId) {
             state.currentImage.description = data.description;
             state.currentImage.tags = data.tags;
+            state.currentImage.analyzed_at = new Date().toISOString();
             if (data.renamed && data.new_filename) {
                 state.currentImage.filename = data.new_filename;
             }
             updateModal();
         }
-        
+
         await updateStats();
         renderImages();
-        
+
+        // Auto-suggest boards after successful analysis
+        // Only suggest if there are existing boards
+        if (state.boards && state.boards.length > 0) {
+            setTimeout(() => {
+                suggestBoardsForImageAuto(imageId);
+            }, 1000); // Wait 1 second after analysis to show suggestion
+        }
+
     } catch (error) {
         showToast('Analysis failed: ' + error.message, 'error');
         throw error;
+    }
+}
+
+async function suggestBoardsForImageAuto(imageId) {
+    try {
+        const image = state.currentImage || state.images.find(img => img.id === imageId);
+
+        if (!image || !image.analyzed_at) {
+            return; // Skip if image not analyzed
+        }
+
+        // Get board suggestions from AI
+        const data = await apiCall(`/images/${imageId}/suggest-boards`, {
+            method: 'POST'
+        });
+
+        if (data.success && data.suggestion) {
+            const suggestion = data.suggestion;
+
+            // Only show auto-suggestions with high confidence (>70%)
+            if (suggestion.confidence < 0.7) {
+                return; // Skip low-confidence suggestions
+            }
+
+            if (suggestion.action === 'add_to_existing') {
+                // AI suggests adding to existing boards
+                const boardNames = suggestion.suggested_boards
+                    .map(boardId => {
+                        const board = findBoardById(boardId, state.boards);
+                        return board ? board.name : `Board #${boardId}`;
+                    })
+                    .join(', ');
+
+                const confidence = (suggestion.confidence * 100).toFixed(0);
+
+                // Auto-add to boards without confirmation if very high confidence (>85%)
+                if (suggestion.confidence >= 0.85) {
+                    // Automatically add to suggested boards
+                    let successCount = 0;
+                    for (const boardId of suggestion.suggested_boards) {
+                        const added = await addImageToBoard(boardId, imageId);
+                        if (added) successCount++;
+                    }
+
+                    if (successCount > 0) {
+                        showToast(
+                            `🤖 Auto-added to: ${boardNames} (${confidence}% confident)`,
+                            'success',
+                            6000
+                        );
+
+                        // Refresh current image details
+                        if (state.currentImage && state.currentImage.id === imageId) {
+                            const refreshedImage = await getImageDetails(imageId);
+                            if (refreshedImage) {
+                                state.currentImage = refreshedImage;
+                                updateModal();
+                            }
+                        }
+                    }
+                } else {
+                    // Ask for confirmation
+                    if (confirm(`🤖 AI suggests adding this image to: ${boardNames}\n\nConfidence: ${confidence}%\nReason: ${suggestion.reasoning}\n\nAdd to these boards?`)) {
+                        let successCount = 0;
+                        for (const boardId of suggestion.suggested_boards) {
+                            const added = await addImageToBoard(boardId, imageId);
+                            if (added) successCount++;
+                        }
+
+                        if (successCount > 0) {
+                            showToast('✅ Image added to suggested boards!', 'success');
+
+                            // Refresh current image details
+                            if (state.currentImage && state.currentImage.id === imageId) {
+                                const refreshedImage = await getImageDetails(imageId);
+                                if (refreshedImage) {
+                                    state.currentImage = refreshedImage;
+                                    updateModal();
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } else if (suggestion.action === 'create_new') {
+                // AI suggests creating a new board - only with confirmation
+                const newBoard = suggestion.new_board;
+                const isSubBoard = newBoard.parent_id !== null && newBoard.parent_id !== undefined;
+                let parentBoardName = '';
+                let boardTypeText = 'new board';
+
+                if (isSubBoard) {
+                    const parentBoard = findBoardById(newBoard.parent_id, state.boards);
+                    if (parentBoard) {
+                        parentBoardName = parentBoard.name;
+                        boardTypeText = `sub-board under "${parentBoardName}"`;
+                    }
+                }
+
+                const confidence = (suggestion.confidence * 100).toFixed(0);
+
+                // Build confirmation message
+                let confirmMsg = `🤖 AI suggests creating a ${boardTypeText}:\n\n`;
+                confirmMsg += `Name: ${newBoard.name}\n`;
+                if (isSubBoard && parentBoardName) {
+                    confirmMsg += `Parent: ${parentBoardName}\n`;
+                }
+                confirmMsg += `Confidence: ${confidence}%\n`;
+                confirmMsg += `Reason: ${suggestion.reasoning}\n\n`;
+                confirmMsg += `Create this board and add the image?`;
+
+                if (confirm(confirmMsg)) {
+                    const boardId = await createBoard(newBoard.name, newBoard.description, newBoard.parent_id || null);
+
+                    if (boardId) {
+                        const added = await addImageToBoard(boardId, imageId);
+
+                        if (added) {
+                            showToast(`✅ ${isSubBoard ? 'Sub-board' : 'Board'} created and image added!`, 'success');
+
+                            // Refresh current image details
+                            if (state.currentImage && state.currentImage.id === imageId) {
+                                const refreshedImage = await getImageDetails(imageId);
+                                if (refreshedImage) {
+                                    state.currentImage = refreshedImage;
+                                    updateModal();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        // Silent fail for auto-suggestions
+        console.log('Auto-suggest boards failed:', error.message);
     }
 }
 
@@ -817,23 +962,46 @@ async function suggestBoardsForImage(imageId) {
                 const newBoard = suggestion.new_board;
                 const confidence = (suggestion.confidence * 100).toFixed(0);
 
+                // Determine if it's a sub-board or top-level
+                const isSubBoard = newBoard.parent_id !== null && newBoard.parent_id !== undefined;
+                let parentBoardName = '';
+                let boardTypeText = 'new board';
+
+                if (isSubBoard) {
+                    const parentBoard = findBoardById(newBoard.parent_id, state.boards);
+                    if (parentBoard) {
+                        parentBoardName = parentBoard.name;
+                        boardTypeText = `sub-board under "${parentBoardName}"`;
+                    }
+                }
+
                 showToast(
-                    `🤖 AI Suggestion (${confidence}% confident): Create new board "${newBoard.name}". ${suggestion.reasoning}`,
+                    `🤖 AI Suggestion (${confidence}% confident): Create ${boardTypeText} "${newBoard.name}". ${suggestion.reasoning}`,
                     'success',
                     8000
                 );
 
+                // Build confirmation message
+                let confirmMsg = `AI suggests creating a ${boardTypeText}:\n\n`;
+                confirmMsg += `Name: ${newBoard.name}\n`;
+                if (isSubBoard && parentBoardName) {
+                    confirmMsg += `Parent: ${parentBoardName}\n`;
+                }
+                confirmMsg += `Description: ${newBoard.description}\n\n`;
+                confirmMsg += `Reason: ${suggestion.reasoning}\n\n`;
+                confirmMsg += `Would you like to create this board and add the image to it?`;
+
                 // Ask user if they want to create the suggested board
-                if (confirm(`AI suggests creating a new board:\n\nName: ${newBoard.name}\nDescription: ${newBoard.description}\n\nReason: ${suggestion.reasoning}\n\nWould you like to create this board and add the image to it?`)) {
-                    // Create the board
-                    const boardId = await createBoard(newBoard.name, newBoard.description, null);
+                if (confirm(confirmMsg)) {
+                    // Create the board with parent_id
+                    const boardId = await createBoard(newBoard.name, newBoard.description, newBoard.parent_id || null);
 
                     if (boardId) {
                         // Add image to the newly created board
                         const added = await addImageToBoard(boardId, imageId);
 
                         if (added) {
-                            showToast('✅ Board created and image added!', 'success');
+                            showToast(`✅ ${isSubBoard ? 'Sub-board' : 'Board'} created and image added!`, 'success');
 
                             // Refresh current image details
                             const refreshedImage = await getImageDetails(imageId);
