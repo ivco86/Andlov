@@ -49,16 +49,19 @@ CRITICAL INSTRUCTIONS:
    - Lighting and color palette if notable
 2. 8-15 comprehensive tags covering:
    - Subject type (woman, man, couple, animal, landscape, etc.)
-   - Art style (comic, realistic, illustrated, cartoon, anime, etc.)
+   - Art style (comic, illustration, photo, cartoon, anime, etc.)
    - Specific features (tattoos, sword, urban, nature, etc.)
    - Mood/atmosphere (dramatic, peaceful, dark, vibrant, etc.)
    - Colors if prominent (monochrome, colorful, blue_tones, etc.)
 3. A suggested filename (descriptive, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
 Guidelines for description:
+- STRICT LIMIT: 2-4 sentences MAXIMUM - be concise!
 - Be specific about art style (very important!) - is it a photo, comic art, illustration, digital art, painting?
+- ONLY describe what IS present - do NOT mention what is NOT there (no "without makeup", "no accessories", etc.)
 - Include notable details like tattoos, piercings, unique clothing, weapons, etc.
 - Describe the setting and mood
+- Focus on POSITIVE attributes - what makes the image interesting
 - Keep it factual and comprehensive but concise (2-4 sentences max)
 
 Guidelines for tags:
@@ -66,9 +69,12 @@ Guidelines for tags:
 - Include subject descriptors (woman, man, portrait, landscape, etc.)
 - Include specific features (tattoos, sword, leather, cyberpunk, etc.)
 - Include mood/atmosphere tags (dark, dramatic, peaceful, etc.)
+- NEVER use negative tags (no "no_mood", "no_accessories", "without_x", etc.)
+- Tags must describe WHAT IS PRESENT, not what is absent
 - Keep tags lowercase, prefer single words or compound_words
 - Ensure they are unique and highly relevant
 - Aim for 8-15 tags for comprehensive categorization
+- Every tag must add VALUE - avoid generic filler tags
 
 Guidelines for filename:
 - Should reflect main subject and key characteristics
@@ -82,7 +88,7 @@ Guidelines for filename:
                 'name': 'Artistic',
                 'description': 'Detailed, poetic, and creative description',
                 'prompt': """Analyze this image with artistic detail and provide:
-1. A detailed, artistic description (4-6 paragraphs) that captures:
+1. A detailed, artistic description (3-4 sentences) that captures:
    - Art style/medium (photograph, comic art, illustration, digital art, painting, etc.) - CRITICAL!
    - Main subjects and their characteristics (features, clothing, accessories, tattoos, etc.)
    - Mood, atmosphere, colors, composition, and emotional impact
@@ -97,12 +103,16 @@ Guidelines for filename:
 3. A suggested filename (descriptive, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
 Guidelines:
+- LIMIT: 3-4 sentences for description - be evocative but concise
 - ALWAYS identify and mention the art style/medium in description
+- ONLY describe what IS visible - do NOT mention absences (no "lacks", "without", "no", etc.)
 - Make the description rich, detailed, and atmospheric
 - Include details about lighting, composition, mood, colors
-- Use vivid, descriptive language
+- Use vivid, descriptive language for PRESENT elements
 - Tags MUST include art style (comic, illustration, photo, cartoon, anime, painted, etc.)
+- NEVER use negative tags (no "no_mood", "without_x", "lacks_y", etc.)
 - Tags should include artistic and technical terms; keep them lowercase, prefer single words or compound_words
+- Every tag must describe something PRESENT in the image
 - Ensure they are unique and relevant
 - Filename should be descriptive but concise
 - Use underscores instead of spaces in filename
@@ -113,7 +123,7 @@ Guidelines:
                 'name': 'Spicy',
                 'description': 'Provocative and attention-grabbing style',
                 'prompt': """Analyze this image with a bold, provocative style and provide:
-1. A captivating description (3-5 paragraphs) that includes:
+1. A captivating description (3-4 sentences) that includes:
    - Art style/medium (photo, comic, illustration, etc.) - REQUIRED
    - Main subjects and striking visual features (tattoos, accessories, unique style, etc.)
    - Attention-grabbing, bold, and engaging language
@@ -126,13 +136,17 @@ Guidelines:
 3. A suggested filename (descriptive, evocative, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
 Guidelines:
+- LIMIT: 3-4 sentences - be bold but concise
 - ALWAYS identify art style/medium first (comic, photo, illustration, etc.)
+- ONLY describe visible elements - do NOT mention what's missing
 - Make the description bold, captivating, and more provocative with sensual, tantalizing language to heighten allure and intensity
-- Emphasize visual appeal and striking elements
+- Emphasize visual appeal and striking elements that ARE PRESENT
 - Use confident, engaging language
 - Focus on what makes the image stand out
 - Tags MUST include art style (comic, illustration, photo, cartoon, anime, etc.)
+- NEVER use negative tags (no "no_x", "without_y", "lacks_z", etc.)
 - Tags should include mood and aesthetics; keep them lowercase, prefer single words or compound_words
+- Every tag must add value and describe something VISIBLE
 - Ensure they are unique and relevant
 - Filename should be descriptive but concise
 - Use underscores instead of spaces in filename
@@ -191,6 +205,9 @@ Format rules:
 - Prefer single words (use compound_words if needed like "comic_art" or "golden_hour")
 - ALWAYS include art style tags (comic, illustration, photo, etc.) - this is CRITICAL
 - Include specific details like tattoos, weapons, clothing style, etc.
+- NEVER use negative tags (no "no_mood", "no_accessories", "without_x", etc.)
+- Tags must describe WHAT IS PRESENT, not what is absent
+- Every tag must add VALUE - no filler tags
 - Ensure tags are unique and highly relevant
 - No hashtags (#) - just plain keywords
 - Aim for 10-15 comprehensive tags"""
