@@ -19,16 +19,26 @@ class AIService:
         self.prompts = {
             'classic': {
                 'name': 'Classic',
-                'description': 'Concise and factual (1-3 sentences)',
-                'prompt': """Analyze this image and provide:
-1. A concise description (1-3 sentences) describing what you see
-2. 5-10 relevant tags (keywords) as a list
+                'description': 'Detailed and comprehensive (2-4 sentences)',
+                'prompt': """Analyze this image thoroughly and provide:
+1. A detailed description (2-4 sentences) that captures:
+   - Main subject(s) and what they're doing
+   - Art style/medium (e.g., photograph, comic art, illustration, cartoon, painting, 3D render, etc.)
+   - Notable visual features (clothing, accessories, tattoos, piercings, hair style/color, etc.)
+   - Setting/environment and atmosphere
+   - Lighting and color palette if notable
+2. 8-15 comprehensive tags covering:
+   - Subject type (woman, man, couple, animal, landscape, etc.)
+   - Art style (comic, realistic, illustrated, cartoon, anime, etc.)
+   - Specific features (tattoos, sword, urban, nature, etc.)
+   - Mood/atmosphere (dramatic, peaceful, dark, vibrant, etc.)
+   - Colors if prominent (monochrome, colorful, blue_tones, etc.)
 3. A suggested filename (descriptive, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
 You must respond with ONLY a valid JSON object in this exact format:
 {
-  "description": "your description here",
-  "tags": ["tag1", "tag2", "tag3"],
+  "description": "your detailed description here",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
   "suggested_filename": "descriptive_filename_here"
 }
 
@@ -39,21 +49,47 @@ CRITICAL INSTRUCTIONS:
 - Do NOT add any commentary or additional text
 - Just the raw JSON object and nothing else
 
-Guidelines:
-- Keep description brief and factual
-- Keep tags lowercase, prefer single words, ensure they are unique and relevant
-- Filename should be descriptive but concise
-- Use underscores instead of spaces in filename
-- Do NOT include file extension in suggested_filename
-- Ensure the JSON is valid with no trailing commas or syntax errors"""
+Guidelines for description:
+- Be specific about art style (very important!) - is it a photo, comic art, illustration, digital art, painting?
+- Include notable details like tattoos, piercings, unique clothing, weapons, etc.
+- Describe the setting and mood
+- Keep it factual and comprehensive but concise (2-4 sentences max)
+
+Guidelines for tags:
+- ALWAYS include art style tags (comic, illustration, photo, cartoon, anime, painted, etc.)
+- Include subject descriptors (woman, man, portrait, landscape, etc.)
+- Include specific features (tattoos, sword, leather, cyberpunk, etc.)
+- Include mood/atmosphere tags (dark, dramatic, peaceful, etc.)
+- Keep tags lowercase, prefer single words or compound_words
+- Ensure they are unique and highly relevant
+- Aim for 8-15 tags for comprehensive categorization
+
+Guidelines for filename:
+- Should reflect main subject and key characteristics
+- Use underscores instead of spaces
+- Keep it descriptive but under 50 chars
+- Do NOT include file extension
+- Example: "woman_with_sword_comic_style" not just "woman_with_sword"
+
+Ensure the JSON is valid with no trailing commas or syntax errors"""
             },
 
             'artistic': {
                 'name': 'Artistic',
                 'description': 'Detailed, poetic, and creative description',
                 'prompt': """Analyze this image with artistic detail and provide:
-1. A detailed, artistic description (4-6 paragraphs) that captures the mood, atmosphere, colors, composition, and emotional impact. Be poetic and evocative.
-2. 8-15 relevant tags including mood, style, and technical aspects
+1. A detailed, artistic description (4-6 paragraphs) that captures:
+   - Art style/medium (photograph, comic art, illustration, digital art, painting, etc.) - CRITICAL!
+   - Main subjects and their characteristics (features, clothing, accessories, tattoos, etc.)
+   - Mood, atmosphere, colors, composition, and emotional impact
+   - Lighting, shadows, and visual techniques
+   - Be poetic and evocative while being accurate
+2. 10-15 comprehensive tags including:
+   - Art style (comic, illustration, photo, painted, etc.) - REQUIRED
+   - Subject type (woman, man, portrait, etc.)
+   - Specific features (tattoos, piercings, weapons, etc.)
+   - Mood and atmosphere
+   - Technical and artistic aspects
 3. A suggested filename (descriptive, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
 You must respond with ONLY a valid JSON object in this exact format:
@@ -71,10 +107,13 @@ CRITICAL INSTRUCTIONS:
 - Just the raw JSON object and nothing else
 
 Guidelines:
+- ALWAYS identify and mention the art style/medium in description
 - Make the description rich, detailed, and atmospheric
 - Include details about lighting, composition, mood, colors
 - Use vivid, descriptive language
-- Tags should include artistic and technical terms; keep them lowercase, prefer single words, ensure they are unique and relevant
+- Tags MUST include art style (comic, illustration, photo, cartoon, anime, painted, etc.)
+- Tags should include artistic and technical terms; keep them lowercase, prefer single words or compound_words
+- Ensure they are unique and relevant
 - Filename should be descriptive but concise
 - Use underscores instead of spaces in filename
 - Do NOT include file extension in suggested_filename
@@ -85,8 +124,16 @@ Guidelines:
                 'name': 'Spicy',
                 'description': 'Provocative and attention-grabbing style',
                 'prompt': """Analyze this image with a bold, provocative style and provide:
-1. A captivating description (3-5 paragraphs) that's attention-grabbing, bold, and engaging. Emphasize the most striking and alluring aspects.
-2. 8-15 tags including mood and aesthetic qualities
+1. A captivating description (3-5 paragraphs) that includes:
+   - Art style/medium (photo, comic, illustration, etc.) - REQUIRED
+   - Main subjects and striking visual features (tattoos, accessories, unique style, etc.)
+   - Attention-grabbing, bold, and engaging language
+   - Emphasis on the most striking and alluring aspects
+2. 10-15 tags including:
+   - Art style (comic, illustration, photo, etc.) - REQUIRED
+   - Subject type and specific features
+   - Mood and aesthetic qualities
+   - Visual characteristics
 3. A suggested filename (descriptive, evocative, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
 You must respond with ONLY a valid JSON object in this exact format:
@@ -104,11 +151,14 @@ CRITICAL INSTRUCTIONS:
 - Just the raw JSON object and nothing else
 
 Guidelines:
+- ALWAYS identify art style/medium first (comic, photo, illustration, etc.)
 - Make the description bold, captivating, and more provocative with sensual, tantalizing language to heighten allure and intensity
 - Emphasize visual appeal and striking elements
 - Use confident, engaging language
 - Focus on what makes the image stand out
-- Tags should include mood and aesthetics; keep them lowercase, prefer single words, ensure they are unique and relevant
+- Tags MUST include art style (comic, illustration, photo, cartoon, anime, etc.)
+- Tags should include mood and aesthetics; keep them lowercase, prefer single words or compound_words
+- Ensure they are unique and relevant
 - Filename should be descriptive but concise
 - Use underscores instead of spaces in filename
 - Do NOT include file extension in suggested_filename
@@ -119,8 +169,16 @@ Guidelines:
                 'name': 'Social Media',
                 'description': 'Optimized for Instagram, Facebook, Twitter',
                 'prompt': """Analyze this image for social media posting and provide:
-1. A social media-ready description (2-4 paragraphs) that's engaging, relatable, and perfect for Instagram, Facebook, or Twitter. Use conversational tone and be authentic.
-2. 10-15 trending hashtags and relevant keywords (include the # for hashtags)
+1. A social media-ready description (2-4 paragraphs) that includes:
+   - Art style/type (photo, comic, illustration, digital art, etc.) - mention naturally
+   - Main subject and notable features (tattoos, style, unique elements, etc.)
+   - Engaging, relatable tone perfect for Instagram, Facebook, or Twitter
+   - Conversational and authentic language
+2. 10-15 trending hashtags and relevant keywords including:
+   - Art style hashtags (#ComicArt, #Illustration, #Photography, etc.)
+   - Subject hashtags (#Portrait, #Fashion, etc.)
+   - Feature hashtags (#Tattoos, #InkedGirls, etc.)
+   - Trending and relevant keywords
 3. A suggested filename (catchy, descriptive, lowercase, use underscores, no spaces, max 50 chars, WITHOUT file extension)
 
 You must respond with ONLY a valid JSON object in this exact format:
@@ -138,9 +196,12 @@ CRITICAL INSTRUCTIONS:
 - Just the raw JSON object and nothing else
 
 Guidelines:
+- Naturally mention art style in description (e.g., "This stunning comic art shows...")
 - Write in a friendly, conversational tone
 - Make it shareable and relatable
-- Tags should include the # for hashtags where appropriate; keep them lowercase, prefer single words or phrases, ensure they are unique and relevant
+- Tags MUST include art style hashtags (#ComicArt, #Illustration, #DigitalArt, etc.)
+- Tags should include the # for hashtags where appropriate; keep them lowercase, prefer single words or phrases
+- Ensure they are unique and relevant
 - Consider what would perform well on social platforms
 - Filename should be descriptive but concise
 - Use underscores instead of spaces in filename
@@ -151,7 +212,7 @@ Guidelines:
             'tags': {
                 'name': 'Tags Only',
                 'description': 'Generate only tags/keywords without description',
-                'prompt': """Analyze this image and provide ONLY tags/keywords.
+                'prompt': """Analyze this image and provide ONLY comprehensive tags/keywords.
 
 You must respond with ONLY a valid JSON object in this exact format:
 {
@@ -162,7 +223,7 @@ You must respond with ONLY a valid JSON object in this exact format:
 
 CRITICAL INSTRUCTIONS:
 - Your ENTIRE response must be ONLY the JSON object above
-- Generate 8-15 relevant, descriptive tags/keywords for this image
+- Generate 10-15 relevant, descriptive tags/keywords for this image
 - Leave description empty (empty string "")
 - Leave suggested_filename empty (empty string "")
 - Do NOT add any explanations before or after the JSON
@@ -170,12 +231,22 @@ CRITICAL INSTRUCTIONS:
 - Do NOT add any commentary or additional text
 - Just the raw JSON object and nothing else
 
-Guidelines for tags:
+Guidelines for tags - MUST include:
+1. Art style (comic, illustration, photo, cartoon, anime, painted, digital_art, etc.) - REQUIRED as first tags
+2. Subject type (woman, man, portrait, landscape, animal, etc.)
+3. Specific features (tattoos, piercings, sword, accessories, etc.)
+4. Mood/atmosphere (dark, dramatic, peaceful, vibrant, etc.)
+5. Colors if prominent (monochrome, colorful, blue_tones, etc.)
+6. Setting (urban, nature, indoor, studio, etc.)
+
+Format rules:
 - Keep tags lowercase
-- Prefer single words (use compound words if needed like "golden_hour")
-- Include objects, colors, mood, setting, composition style
+- Prefer single words (use compound_words if needed like "comic_art" or "golden_hour")
+- ALWAYS include art style tags (comic, illustration, photo, etc.) - this is CRITICAL
+- Include specific details like tattoos, weapons, clothing style, etc.
 - Ensure tags are unique and highly relevant
 - No hashtags (#) - just plain keywords
+- Aim for 10-15 comprehensive tags
 - Ensure the JSON is valid with no trailing commas or syntax errors"""
             },
 
