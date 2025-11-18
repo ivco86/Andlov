@@ -21,6 +21,9 @@ const state = {
     selectionMode: false,
     selectedImages: new Set(),
 
+    // Board collapse state
+    collapsedBoards: new Set(),
+
     // Operation locks
     isScanning: false,
     isAnalyzing: false,
@@ -46,6 +49,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initializeApp() {
     showLoading();
+
+    // Load collapsed boards state from localStorage
+    const savedCollapsed = localStorage.getItem('collapsedBoards');
+    if (savedCollapsed) {
+        try {
+            const collapsed = JSON.parse(savedCollapsed);
+            state.collapsedBoards = new Set(collapsed);
+        } catch (e) {
+            console.error('Failed to load collapsed boards state:', e);
+        }
+    }
 
     // Check system health
     await checkHealth();
@@ -1011,20 +1025,37 @@ function renderTagCloud() {
 
 function createBoardItem(board, isSubBoard = false) {
     const subBoardClass = isSubBoard ? 'sub-board' : '';
-    
+    const hasSubBoards = board.sub_boards && board.sub_boards.length > 0;
+
+    // Check if board is collapsed (default: expanded)
+    const isCollapsed = state.collapsedBoards && state.collapsedBoards.has(board.id);
+    const collapseIcon = isCollapsed ? '▶' : '▼';
+
     let html = `
-        <li>
-            <a href="#" class="nav-item ${subBoardClass}" data-board-id="${board.id}">
-                <span class="icon">📁</span>
-                <span>${escapeHtml(board.name)}</span>
-            </a>
-        </li>
+        <li class="board-item ${hasSubBoards ? 'has-sub-boards' : ''}" data-board-id="${board.id}">
+            <div class="board-item-wrapper">
+                ${hasSubBoards ? `
+                    <span class="board-collapse-toggle" data-board-id="${board.id}">
+                        ${collapseIcon}
+                    </span>
+                ` : '<span class="board-spacer"></span>'}
+                <a href="#" class="nav-item ${subBoardClass}" data-board-id="${board.id}">
+                    <span class="icon">${hasSubBoards ? '📂' : '📁'}</span>
+                    <span class="board-name">${escapeHtml(board.name)}</span>
+                    ${board.image_count !== undefined ? `<span class="count">${board.image_count}</span>` : ''}
+                </a>
+            </div>
     `;
-    
-    if (board.sub_boards && board.sub_boards.length > 0) {
+
+    if (hasSubBoards) {
+        const subBoardsClass = isCollapsed ? 'sub-boards collapsed' : 'sub-boards';
+        html += `<ul class="${subBoardsClass}">`;
         html += board.sub_boards.map(sub => createBoardItem(sub, true)).join('');
+        html += '</ul>';
     }
-    
+
+    html += '</li>';
+
     return html;
 }
 
@@ -1481,6 +1512,20 @@ function getAllSubBoardIds(boardId, boards) {
     return ids;
 }
 
+function toggleBoardCollapse(boardId) {
+    if (state.collapsedBoards.has(boardId)) {
+        state.collapsedBoards.delete(boardId);
+    } else {
+        state.collapsedBoards.add(boardId);
+    }
+
+    // Save to localStorage
+    localStorage.setItem('collapsedBoards', JSON.stringify([...state.collapsedBoards]));
+
+    // Re-render boards
+    renderBoards();
+}
+
 // Board Context Menu
 function showBoardContextMenu(boardId, x, y) {
     const contextMenu = document.getElementById('boardContextMenu');
@@ -1623,6 +1668,17 @@ function attachEventListeners() {
     const boardsList = document.getElementById('boardsList');
     if (boardsList) {
         boardsList.addEventListener('click', (e) => {
+            // Check for collapse toggle first
+            const collapseToggle = e.target.closest('.board-collapse-toggle');
+            if (collapseToggle) {
+                e.preventDefault();
+                e.stopPropagation();
+                const boardId = parseInt(collapseToggle.dataset.boardId);
+                toggleBoardCollapse(boardId);
+                return;
+            }
+
+            // Then check for nav item click
             const navItem = e.target.closest('.nav-item[data-board-id]');
             if (navItem) {
                 e.preventDefault();

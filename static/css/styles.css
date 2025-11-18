@@ -316,51 +316,117 @@ body {
     list-style: none;
 }
 
+/* Board items structure */
+.board-item {
+    list-style: none;
+    margin-bottom: 2px;
+}
+
+.board-item-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.board-collapse-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 10px;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.board-collapse-toggle:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent-pink);
+    transform: scale(1.1);
+}
+
+.board-spacer {
+    width: 20px;
+    flex-shrink: 0;
+}
+
 .nav-item {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    padding: 12px 14px;
+    padding: 10px 12px;
     color: var(--text-secondary);
     text-decoration: none;
     border-radius: var(--radius-md);
-    margin-bottom: var(--spacing-xs);
     transition: all var(--transition-normal);
     font-weight: 600;
     position: relative;
+    flex: 1;
 }
 
 .nav-item:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
-    transform: translateX(4px);
+    transform: translateX(2px);
 }
 
 .nav-item.active {
     background: linear-gradient(135deg, rgba(255, 0, 110, 0.2) 0%, rgba(123, 44, 191, 0.2) 100%);
     color: var(--accent-pink);
     border-left: 3px solid var(--accent-pink);
+    padding-left: 9px;
 }
 
 .nav-item .icon {
     font-size: 18px;
+    flex-shrink: 0;
+}
+
+.nav-item .board-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .nav-item .count {
     margin-left: auto;
     background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-pink) 100%);
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
     font-weight: 700;
-    min-width: 28px;
+    min-width: 24px;
     text-align: center;
-    box-shadow: 0 2px 10px rgba(123, 44, 191, 0.4);
+    box-shadow: 0 2px 8px rgba(123, 44, 191, 0.3);
+    flex-shrink: 0;
+}
+
+/* Sub-boards container */
+.sub-boards {
+    list-style: none;
+    margin-left: 24px;
+    padding-left: 8px;
+    border-left: 2px solid var(--border-color);
+    margin-top: 4px;
+    transition: all var(--transition-normal);
+}
+
+.sub-boards.collapsed {
+    display: none;
 }
 
 .nav-item.sub-board {
-    padding-left: var(--spacing-lg);
     font-size: 13px;
+    padding: 8px 10px;
+}
+
+.nav-item.sub-board .icon {
+    font-size: 16px;
 }
 
 /* ============ Tag Cloud ============ */
