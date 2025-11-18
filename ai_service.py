@@ -307,10 +307,7 @@ Format rules:
                     }
                 ],
                 "max_tokens": 500,
-                "temperature": 0.7,
-                "response_format": {  # Force JSON output if LM Studio supports it
-                    "type": "json_object"
-                }
+                "temperature": 0.7
             }
             
             logger.debug("Sending analysis request to %s", self.api_endpoint)
@@ -589,10 +586,7 @@ CRITICAL:
                     }
                 ],
                 "max_tokens": 300,
-                "temperature": 0.5,  # Lower temperature for more consistent suggestions
-                "response_format": {  # Force JSON output if LM Studio supports it
-                    "type": "json_object"
-                }
+                "temperature": 0.5  # Lower temperature for more consistent suggestions
             }
 
             logger.debug("Requesting board suggestions from LM Studio...")
