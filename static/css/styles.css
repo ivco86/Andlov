@@ -367,6 +367,100 @@ body {
     font-size: 13px;
 }
 
+/* ============ Board Pills ============ */
+
+.board-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 8px 14px;
+    margin-bottom: var(--spacing-xs);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    font-weight: 600;
+    font-size: 13px;
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    justify-content: space-between;
+}
+
+.board-pill:hover {
+    transform: translateY(-2px) translateX(4px);
+    box-shadow: 0 4px 16px rgba(255, 0, 110, 0.4);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.board-pill.active {
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 4px 20px rgba(255, 0, 110, 0.6);
+}
+
+.board-pill-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.board-pill-count {
+    background: rgba(255, 255, 255, 0.25);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 24px;
+    text-align: center;
+}
+
+.board-pill-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.board-pill:hover .board-pill-actions {
+    opacity: 1;
+}
+
+.board-pill-action {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+
+.board-pill-action:hover {
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(1.15);
+}
+
+.board-pill.has-children {
+    border-left: 4px solid rgba(255, 255, 255, 0.5);
+}
+
+.board-sub-pills {
+    margin-left: var(--spacing-md);
+    padding-left: var(--spacing-sm);
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.board-sub-pills .board-pill {
+    font-size: 12px;
+    padding: 6px 12px;
+}
+
 /* ============ Tag Cloud ============ */
 
 .tag-cloud {
