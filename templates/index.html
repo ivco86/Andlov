@@ -75,9 +75,25 @@
             <div class="sidebar-section">
                 <div class="section-header">
                     <h3>Boards</h3>
-                    <button class="btn-icon" id="createBoardBtn" title="Create Board" aria-label="Create new board">+</button>
+                    <div class="board-controls">
+                        <div class="sort-dropdown">
+                            <button class="btn-icon" id="sortBoardsBtn" title="Sort boards" aria-label="Sort boards">⇅</button>
+                            <div class="sort-menu" id="boardSortMenu" style="display: none;">
+                                <div class="sort-option" data-sort="name">
+                                    <span class="sort-icon">🔤</span> Name
+                                </div>
+                                <div class="sort-option" data-sort="date">
+                                    <span class="sort-icon">📅</span> Date
+                                </div>
+                                <div class="sort-option" data-sort="count">
+                                    <span class="sort-icon">🖼️</span> Images
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn-icon" id="createBoardBtn" title="Create Board" aria-label="Create new board">+</button>
+                    </div>
                 </div>
-                <ul class="nav-list" id="boardsList">
+                <ul class="nav-list boards-grid" id="boardsList">
                     <!-- Boards will be loaded here -->
                 </ul>
             </div>
@@ -108,9 +124,38 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Breadcrumb -->
-            <div class="breadcrumb" id="breadcrumb">
-                <span class="breadcrumb-item">All Images</span>
+            <!-- Breadcrumb & Sort Controls -->
+            <div class="content-header">
+                <div class="breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item">All Images</span>
+                </div>
+                <div class="view-controls">
+                    <div class="sort-dropdown">
+                        <button class="btn-sort" id="sortImagesBtn" title="Sort images">
+                            <span class="sort-icon">⇅</span> Sort
+                        </button>
+                        <div class="sort-menu" id="imageSortMenu" style="display: none;">
+                            <div class="sort-option active" data-sort="date-desc">
+                                <span class="sort-icon">📅↓</span> Newest first
+                            </div>
+                            <div class="sort-option" data-sort="date-asc">
+                                <span class="sort-icon">📅↑</span> Oldest first
+                            </div>
+                            <div class="sort-option" data-sort="name-asc">
+                                <span class="sort-icon">🔤↑</span> Name A-Z
+                            </div>
+                            <div class="sort-option" data-sort="name-desc">
+                                <span class="sort-icon">🔤↓</span> Name Z-A
+                            </div>
+                            <div class="sort-option" data-sort="size-desc">
+                                <span class="sort-icon">📏↓</span> Largest first
+                            </div>
+                            <div class="sort-option" data-sort="size-asc">
+                                <span class="sort-icon">📏↑</span> Smallest first
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Loading State -->

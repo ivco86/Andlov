@@ -24,7 +24,11 @@ const state = {
     // Operation locks
     isScanning: false,
     isAnalyzing: false,
-    isUploading: false
+    isUploading: false,
+
+    // Sorting
+    boardSort: 'name',
+    imageSort: 'date-desc'
 };
 
 // Constants
@@ -850,7 +854,7 @@ function escapeHtml(text) {
 function renderImages() {
     const grid = document.getElementById('imageGrid');
     const emptyState = document.getElementById('emptyState');
-    
+
     if (state.images.length === 0) {
         grid.style.display = 'none';
         emptyState.style.display = 'flex';
@@ -860,7 +864,45 @@ function renderImages() {
     grid.style.display = 'block';
     emptyState.style.display = 'none';
 
-    grid.innerHTML = state.images.map(image => createImageCard(image)).join('');
+    // Sort images before rendering
+    const sortedImages = sortImages([...state.images], state.imageSort);
+
+    grid.innerHTML = sortedImages.map(image => createImageCard(image)).join('');
+}
+
+function sortImages(images, sortType) {
+    const sorted = [...images];
+
+    switch (sortType) {
+        case 'date-desc':
+            sorted.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateB - dateA; // Newest first
+            });
+            break;
+        case 'date-asc':
+            sorted.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateA - dateB; // Oldest first
+            });
+            break;
+        case 'name-asc':
+            sorted.sort((a, b) => a.filename.localeCompare(b.filename));
+            break;
+        case 'name-desc':
+            sorted.sort((a, b) => b.filename.localeCompare(a.filename));
+            break;
+        case 'size-desc':
+            sorted.sort((a, b) => (b.file_size || 0) - (a.file_size || 0));
+            break;
+        case 'size-asc':
+            sorted.sort((a, b) => (a.file_size || 0) - (b.file_size || 0));
+            break;
+    }
+
+    return sorted;
 }
 
 function createImageCard(image) {
@@ -922,17 +964,49 @@ function createImageCard(image) {
 function renderBoards() {
     const boardsList = document.getElementById('boardsList');
     const boardParentSelect = document.getElementById('boardParent');
-    
+
     if (state.boards.length === 0) {
         boardsList.innerHTML = '<li style="color: var(--text-muted); padding: var(--spacing-sm);">No boards yet</li>';
         boardParentSelect.innerHTML = '<option value="">-- Top Level --</option>';
         return;
     }
-    
-    boardsList.innerHTML = state.boards.map(board => createBoardItem(board)).join('');
-    
+
+    // Sort boards before rendering
+    const sortedBoards = sortBoards([...state.boards], state.boardSort);
+
+    boardsList.innerHTML = sortedBoards.map(board => createBoardItem(board)).join('');
+
     boardParentSelect.innerHTML = '<option value="">-- Top Level --</option>' +
         state.boards.map(board => createBoardOption(board)).join('');
+}
+
+function sortBoards(boards, sortType) {
+    const sorted = [...boards];
+
+    switch (sortType) {
+        case 'name':
+            sorted.sort((a, b) => a.name.localeCompare(b.name));
+            break;
+        case 'date':
+            sorted.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateB - dateA; // Newest first
+            });
+            break;
+        case 'count':
+            sorted.sort((a, b) => (b.image_count || 0) - (a.image_count || 0));
+            break;
+    }
+
+    // Recursively sort sub-boards
+    sorted.forEach(board => {
+        if (board.sub_boards && board.sub_boards.length > 0) {
+            board.sub_boards = sortBoards(board.sub_boards, sortType);
+        }
+    });
+
+    return sorted;
 }
 
 function renderTagCloud() {
@@ -989,20 +1063,46 @@ function renderTagCloud() {
 
 function createBoardItem(board, isSubBoard = false) {
     const subBoardClass = isSubBoard ? 'sub-board' : '';
-    
+    const imageCount = board.image_count || 0;
+
+    // Get gradient colors based on board name hash
+    const gradients = [
+        ['#ff006e', '#7b2cbf'],
+        ['#00f5d4', '#7b2cbf'],
+        ['#ff006e', '#00f5d4'],
+        ['#7b2cbf', '#ff006e'],
+        ['#c1121f', '#ff006e'],
+        ['#00f5d4', '#c1121f']
+    ];
+    const hash = board.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const [color1, color2] = gradients[hash % gradients.length];
+
     let html = `
-        <li>
-            <a href="#" class="nav-item ${subBoardClass}" data-board-id="${board.id}">
-                <span class="icon">📁</span>
-                <span>${escapeHtml(board.name)}</span>
-            </a>
+        <li class="board-card-wrapper ${subBoardClass}">
+            <div class="board-card" data-board-id="${board.id}">
+                <div class="board-card-bg" style="background: linear-gradient(135deg, ${color1}, ${color2});"></div>
+                <div class="board-card-content">
+                    <div class="board-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1"/>
+                            <rect x="14" y="3" width="7" height="7" rx="1"/>
+                            <rect x="14" y="14" width="7" height="7" rx="1"/>
+                            <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        </svg>
+                    </div>
+                    <div class="board-card-info">
+                        <div class="board-card-name">${escapeHtml(board.name)}</div>
+                        <div class="board-card-count">${imageCount} ${imageCount === 1 ? 'image' : 'images'}</div>
+                    </div>
+                </div>
+            </div>
         </li>
     `;
-    
+
     if (board.sub_boards && board.sub_boards.length > 0) {
         html += board.sub_boards.map(sub => createBoardItem(sub, true)).join('');
     }
-    
+
     return html;
 }
 
@@ -1566,20 +1666,20 @@ function attachEventListeners() {
     const boardsList = document.getElementById('boardsList');
     if (boardsList) {
         boardsList.addEventListener('click', (e) => {
-            const navItem = e.target.closest('.nav-item[data-board-id]');
-            if (navItem) {
+            const boardCard = e.target.closest('.board-card[data-board-id]');
+            if (boardCard) {
                 e.preventDefault();
-                const boardId = parseInt(navItem.dataset.boardId);
+                const boardId = parseInt(boardCard.dataset.boardId);
                 switchView('board', boardId);
             }
         });
 
         // Right-click context menu on boards
         boardsList.addEventListener('contextmenu', (e) => {
-            const navItem = e.target.closest('.nav-item[data-board-id]');
-            if (navItem) {
+            const boardCard = e.target.closest('.board-card[data-board-id]');
+            if (boardCard) {
                 e.preventDefault();
-                const boardId = parseInt(navItem.dataset.boardId);
+                const boardId = parseInt(boardCard.dataset.boardId);
                 showBoardContextMenu(boardId, e.pageX, e.pageY);
             }
         });
@@ -1976,6 +2076,61 @@ function attachEventListeners() {
             e.preventDefault();
             if (searchInput) searchInput.focus();
         }
+    });
+
+    // Sorting Controls
+    const sortBoardsBtn = document.getElementById('sortBoardsBtn');
+    const boardSortMenu = document.getElementById('boardSortMenu');
+    const sortImagesBtn = document.getElementById('sortImagesBtn');
+    const imageSortMenu = document.getElementById('imageSortMenu');
+
+    // Board sorting
+    if (sortBoardsBtn && boardSortMenu) {
+        sortBoardsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            boardSortMenu.style.display = boardSortMenu.style.display === 'none' ? 'block' : 'none';
+            if (imageSortMenu) imageSortMenu.style.display = 'none';
+        });
+
+        boardSortMenu.addEventListener('click', (e) => {
+            const option = e.target.closest('.sort-option');
+            if (option) {
+                state.boardSort = option.dataset.sort;
+                renderBoards();
+                boardSortMenu.style.display = 'none';
+                showToast('Boards sorted!', 'success');
+            }
+        });
+    }
+
+    // Image sorting
+    if (sortImagesBtn && imageSortMenu) {
+        sortImagesBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            imageSortMenu.style.display = imageSortMenu.style.display === 'none' ? 'block' : 'none';
+            if (boardSortMenu) boardSortMenu.style.display = 'none';
+        });
+
+        imageSortMenu.addEventListener('click', (e) => {
+            const option = e.target.closest('.sort-option');
+            if (option) {
+                state.imageSort = option.dataset.sort;
+
+                // Update active state
+                imageSortMenu.querySelectorAll('.sort-option').forEach(opt => opt.classList.remove('active'));
+                option.classList.add('active');
+
+                renderImages();
+                imageSortMenu.style.display = 'none';
+                showToast('Images sorted!', 'success');
+            }
+        });
+    }
+
+    // Close sort menus on outside click
+    document.addEventListener('click', () => {
+        if (boardSortMenu) boardSortMenu.style.display = 'none';
+        if (imageSortMenu) imageSortMenu.style.display = 'none';
     });
 }
 

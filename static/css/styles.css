@@ -363,6 +363,194 @@ body {
     font-size: 13px;
 }
 
+/* ============ Board Cards (New Design) ============ */
+
+.board-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.boards-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+    list-style: none;
+}
+
+.board-card-wrapper {
+    list-style: none;
+}
+
+.board-card-wrapper.sub-board {
+    margin-left: var(--spacing-lg);
+    margin-top: var(--spacing-sm);
+}
+
+.board-card {
+    position: relative;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    height: 80px;
+}
+
+.board-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.board-card-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.15;
+    transition: opacity var(--transition-normal);
+}
+
+.board-card:hover .board-card-bg {
+    opacity: 0.25;
+}
+
+.board-card-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    height: 100%;
+}
+
+.board-card-icon {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.board-card-icon svg {
+    width: 24px;
+    height: 24px;
+    color: var(--text-primary);
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+}
+
+.board-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.board-card-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.board-card-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+/* ============ Sort Controls ============ */
+
+.sort-dropdown {
+    position: relative;
+}
+
+.btn-sort {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.btn-sort:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--accent-purple);
+}
+
+.sort-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    min-width: 180px;
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+}
+
+.sort-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.sort-option:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.sort-option.active {
+    background: linear-gradient(135deg, rgba(255, 0, 110, 0.2) 0%, rgba(123, 44, 191, 0.2) 100%);
+    color: var(--accent-pink);
+    border-left: 3px solid var(--accent-pink);
+}
+
+.sort-option .sort-icon {
+    font-size: 16px;
+}
+
+/* Content Header */
+.content-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+    gap: var(--spacing-md);
+}
+
+.view-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
 /* ============ Tag Cloud ============ */
 
 .tag-cloud {
