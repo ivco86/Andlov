@@ -1259,14 +1259,26 @@ def boards():
     """Get all boards or create new board"""
     if request.method == 'GET':
         all_boards = db.get_all_boards()
-        
+
+        # Add image count for each board
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        for board in all_boards:
+            cursor.execute(
+                'SELECT COUNT(*) as count FROM board_images WHERE board_id = ?',
+                (board['id'],)
+            )
+            result = cursor.fetchone()
+            board['image_count'] = result['count'] if result else 0
+        conn.close()
+
         # Organize into hierarchy
         top_level = []
         boards_map = {board['id']: board for board in all_boards}
-        
+
         for board in all_boards:
             board['sub_boards'] = []
-        
+
         for board in all_boards:
             if board['parent_id'] is None:
                 top_level.append(board)
@@ -1274,23 +1286,23 @@ def boards():
                 parent = boards_map.get(board['parent_id'])
                 if parent:
                     parent['sub_boards'].append(board)
-        
+
         return jsonify({
             'boards': top_level,
             'total': len(all_boards)
         })
-    
+
     elif request.method == 'POST':
         data = request.json
         name = data.get('name')
         description = data.get('description')
         parent_id = data.get('parent_id')
-        
+
         if not name:
             return jsonify({'error': 'Board name is required'}), 400
-        
+
         board_id = db.create_board(name, description, parent_id)
-        
+
         return jsonify({
             'success': True,
             'board_id': board_id,
