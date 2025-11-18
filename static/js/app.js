@@ -27,7 +27,6 @@ const state = {
     isUploading: false,
 
     // Sorting
-    boardSort: 'name',
     imageSort: 'date-desc'
 };
 
@@ -971,42 +970,10 @@ function renderBoards() {
         return;
     }
 
-    // Sort boards before rendering
-    const sortedBoards = sortBoards([...state.boards], state.boardSort);
-
-    boardsList.innerHTML = sortedBoards.map(board => createBoardItem(board)).join('');
+    boardsList.innerHTML = state.boards.map(board => createBoardItem(board)).join('');
 
     boardParentSelect.innerHTML = '<option value="">-- Top Level --</option>' +
         state.boards.map(board => createBoardOption(board)).join('');
-}
-
-function sortBoards(boards, sortType) {
-    const sorted = [...boards];
-
-    switch (sortType) {
-        case 'name':
-            sorted.sort((a, b) => a.name.localeCompare(b.name));
-            break;
-        case 'date':
-            sorted.sort((a, b) => {
-                const dateA = new Date(a.created_at || 0);
-                const dateB = new Date(b.created_at || 0);
-                return dateB - dateA; // Newest first
-            });
-            break;
-        case 'count':
-            sorted.sort((a, b) => (b.image_count || 0) - (a.image_count || 0));
-            break;
-    }
-
-    // Recursively sort sub-boards
-    sorted.forEach(board => {
-        if (board.sub_boards && board.sub_boards.length > 0) {
-            board.sub_boards = sortBoards(board.sub_boards, sortType);
-        }
-    });
-
-    return sorted;
 }
 
 function renderTagCloud() {
@@ -2079,36 +2046,14 @@ function attachEventListeners() {
     });
 
     // Sorting Controls
-    const sortBoardsBtn = document.getElementById('sortBoardsBtn');
-    const boardSortMenu = document.getElementById('boardSortMenu');
     const sortImagesBtn = document.getElementById('sortImagesBtn');
     const imageSortMenu = document.getElementById('imageSortMenu');
-
-    // Board sorting
-    if (sortBoardsBtn && boardSortMenu) {
-        sortBoardsBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            boardSortMenu.style.display = boardSortMenu.style.display === 'none' ? 'block' : 'none';
-            if (imageSortMenu) imageSortMenu.style.display = 'none';
-        });
-
-        boardSortMenu.addEventListener('click', (e) => {
-            const option = e.target.closest('.sort-option');
-            if (option) {
-                state.boardSort = option.dataset.sort;
-                renderBoards();
-                boardSortMenu.style.display = 'none';
-                showToast('Boards sorted!', 'success');
-            }
-        });
-    }
 
     // Image sorting
     if (sortImagesBtn && imageSortMenu) {
         sortImagesBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             imageSortMenu.style.display = imageSortMenu.style.display === 'none' ? 'block' : 'none';
-            if (boardSortMenu) boardSortMenu.style.display = 'none';
         });
 
         imageSortMenu.addEventListener('click', (e) => {
@@ -2129,9 +2074,26 @@ function attachEventListeners() {
 
     // Close sort menus on outside click
     document.addEventListener('click', () => {
-        if (boardSortMenu) boardSortMenu.style.display = 'none';
         if (imageSortMenu) imageSortMenu.style.display = 'none';
     });
+
+    // Duplicate Finder
+    const findDuplicatesBtn = document.getElementById('findDuplicatesBtn');
+    const duplicatesModal = document.getElementById('duplicatesModal');
+    const duplicatesClose = document.getElementById('duplicatesClose');
+    const duplicatesOverlay = document.getElementById('duplicatesOverlay');
+
+    if (findDuplicatesBtn) {
+        findDuplicatesBtn.addEventListener('click', findDuplicates);
+    }
+
+    if (duplicatesClose) {
+        duplicatesClose.addEventListener('click', closeDuplicatesModal);
+    }
+
+    if (duplicatesOverlay) {
+        duplicatesOverlay.addEventListener('click', closeDuplicatesModal);
+    }
 }
 
 // ============ Helper Functions ============
@@ -2816,6 +2778,145 @@ async function batchAddImagesToBoard() {
 
     // Open modal (reuse existing add to board modal)
     openAddToBoardModal(selectedIds[0], true); // true indicates batch mode
+}
+
+// ============ Duplicate Finder ============
+
+async function findDuplicates() {
+    const modal = document.getElementById('duplicatesModal');
+    const loading = document.getElementById('duplicatesLoading');
+    const content = document.getElementById('duplicatesContent');
+    const empty = document.getElementById('duplicatesEmpty');
+
+    // Show modal
+    if (modal) modal.style.display = 'block';
+    if (loading) loading.style.display = 'block';
+    if (content) content.innerHTML = '';
+    if (empty) empty.style.display = 'none';
+
+    try {
+        // Get all images from current view
+        const images = state.images;
+
+        if (images.length === 0) {
+            showToast('No images to analyze', 'warning');
+            closeDuplicatesModal();
+            return;
+        }
+
+        // Group images by file size (quick first pass)
+        const sizeGroups = new Map();
+        images.forEach(img => {
+            const size = img.file_size || 0;
+            if (!sizeGroups.has(size)) {
+                sizeGroups.set(size, []);
+            }
+            sizeGroups.get(size).push(img);
+        });
+
+        // Find potential duplicates (same size)
+        const duplicateGroups = [];
+        sizeGroups.forEach((group, size) => {
+            if (group.length > 1 && size > 0) {
+                // Further group by filename similarity
+                const nameGroups = new Map();
+                group.forEach(img => {
+                    // Extract base filename without extension and numbers
+                    const baseName = img.filename
+                        .replace(/\.[^.]+$/, '') // remove extension
+                        .replace(/[_\-\s]*\d+[_\-\s]*$/, '') // remove trailing numbers
+                        .toLowerCase();
+
+                    if (!nameGroups.has(baseName)) {
+                        nameGroups.set(baseName, []);
+                    }
+                    nameGroups.get(baseName).push(img);
+                });
+
+                nameGroups.forEach(nameGroup => {
+                    if (nameGroup.length > 1) {
+                        duplicateGroups.push(nameGroup);
+                    }
+                });
+            }
+        });
+
+        if (loading) loading.style.display = 'none';
+
+        if (duplicateGroups.length === 0) {
+            if (empty) empty.style.display = 'block';
+        } else {
+            if (content) {
+                content.innerHTML = `
+                    <p style="margin-bottom: var(--spacing-lg); color: var(--text-secondary);">
+                        Found ${duplicateGroups.length} group${duplicateGroups.length > 1 ? 's' : ''} of potential duplicates
+                    </p>
+                    ${duplicateGroups.map((group, index) => createDuplicateGroup(group, index)).join('')}
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('Error finding duplicates:', error);
+        showToast('Error analyzing duplicates', 'error');
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function createDuplicateGroup(images, groupIndex) {
+    return `
+        <div class="duplicate-group" style="margin-bottom: var(--spacing-xl);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                <h3 style="font-size: 16px; color: var(--text-primary);">
+                    Group ${groupIndex + 1}
+                    <span style="color: var(--text-secondary); font-size: 14px; font-weight: normal;">
+                        (${images.length} images, ${formatFileSize(images[0].file_size || 0)})
+                    </span>
+                </h3>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--spacing-md);">
+                ${images.map(img => createDuplicateCard(img)).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function createDuplicateCard(image) {
+    const isVideo = image.media_type === 'video';
+
+    return `
+        <div class="duplicate-card" style="position: relative; cursor: pointer;" onclick="openImageModal(state.images.find(img => img.id === ${image.id}))">
+            <div style="position: relative; aspect-ratio: 1; overflow: hidden; border-radius: var(--radius-md); background: var(--bg-tertiary);">
+                ${isVideo ?
+                    `<img
+                        src="/api/images/${image.id}/thumbnail?size=300"
+                        alt="${escapeHtml(image.filename)}"
+                        style="width: 100%; height: 100%; object-fit: cover;"
+                    >
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                        <div style="font-size: 20px;">▶</div>
+                    </div>` :
+                    `<img
+                        src="/api/images/${image.id}/thumbnail?size=300"
+                        alt="${escapeHtml(image.filename)}"
+                        style="width: 100%; height: 100%; object-fit: cover;"
+                    >`
+                }
+            </div>
+            <div style="padding: var(--spacing-sm); background: var(--bg-secondary); border-radius: 0 0 var(--radius-md) var(--radius-md);">
+                <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(image.filename)}">
+                    ${escapeHtml(image.filename)}
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary);">
+                    ${image.width || 0}×${image.height || 0}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function closeDuplicatesModal() {
+    const modal = document.getElementById('duplicatesModal');
+    if (modal) modal.style.display = 'none';
 }
 
 console.log('AI Gallery initialized ✨');

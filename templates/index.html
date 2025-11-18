@@ -75,23 +75,7 @@
             <div class="sidebar-section">
                 <div class="section-header">
                     <h3>Boards</h3>
-                    <div class="board-controls">
-                        <div class="sort-dropdown">
-                            <button class="btn-icon" id="sortBoardsBtn" title="Sort boards" aria-label="Sort boards">⇅</button>
-                            <div class="sort-menu" id="boardSortMenu" style="display: none;">
-                                <div class="sort-option" data-sort="name">
-                                    <span class="sort-icon">🔤</span> Name
-                                </div>
-                                <div class="sort-option" data-sort="date">
-                                    <span class="sort-icon">📅</span> Date
-                                </div>
-                                <div class="sort-option" data-sort="count">
-                                    <span class="sort-icon">🖼️</span> Images
-                                </div>
-                            </div>
-                        </div>
-                        <button class="btn-icon" id="createBoardBtn" title="Create Board" aria-label="Create new board">+</button>
-                    </div>
+                    <button class="btn-icon" id="createBoardBtn" title="Create Board" aria-label="Create new board">+</button>
                 </div>
                 <ul class="nav-list boards-grid" id="boardsList">
                     <!-- Boards will be loaded here -->
@@ -130,6 +114,9 @@
                     <span class="breadcrumb-item">All Images</span>
                 </div>
                 <div class="view-controls">
+                    <button class="btn btn-secondary" id="findDuplicatesBtn" title="Find duplicate images">
+                        🔍 Find Duplicates
+                    </button>
                     <div class="sort-dropdown">
                         <button class="btn-sort" id="sortImagesBtn" title="Sort images">
                             <span class="sort-icon">⇅</span> Sort
@@ -547,6 +534,33 @@
         </div>
         <div class="context-menu-item" data-action="delete">
             🗑️ Delete
+        </div>
+    </div>
+
+    <!-- Duplicates Modal -->
+    <div class="modal" id="duplicatesModal" style="display: none;">
+        <div class="modal-overlay" id="duplicatesOverlay"></div>
+        <div class="modal-content" style="max-width: 1200px;">
+            <button class="modal-close" id="duplicatesClose" aria-label="Close duplicates modal">&times;</button>
+
+            <div class="modal-body">
+                <h2>🔍 Duplicate Images</h2>
+
+                <div id="duplicatesLoading" style="display: none; text-align: center; padding: var(--spacing-xl);">
+                    <div class="spinner"></div>
+                    <p style="margin-top: var(--spacing-md); color: var(--text-secondary);">Analyzing images for duplicates...</p>
+                </div>
+
+                <div id="duplicatesContent">
+                    <!-- Duplicate groups will be displayed here -->
+                </div>
+
+                <div id="duplicatesEmpty" style="display: none; text-align: center; padding: var(--spacing-xl);">
+                    <div style="font-size: 48px; margin-bottom: var(--spacing-md);">✓</div>
+                    <h3>No Duplicates Found</h3>
+                    <p style="color: var(--text-secondary);">All your images are unique!</p>
+                </div>
+            </div>
         </div>
     </div>
 
