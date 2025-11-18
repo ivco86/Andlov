@@ -366,6 +366,40 @@
         </div>
     </div>
 
+    <!-- Move Board Modal -->
+    <div class="modal" id="moveBoardModal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-small">
+            <button class="modal-close" id="moveBoardClose" aria-label="Close move board modal">&times;</button>
+
+            <div class="modal-body">
+                <h2>Move Board</h2>
+
+                <p style="margin-bottom: var(--spacing-md); color: var(--text-secondary);">
+                    Move <strong id="moveSourceName"></strong> to a new location.
+                </p>
+
+                <form id="moveBoardForm">
+                    <div class="form-group">
+                        <label for="moveTargetBoard">Move to *</label>
+                        <select id="moveTargetBoard" required>
+                            <option value="">-- Top Level (Make Independent) --</option>
+                        </select>
+                    </div>
+
+                    <p style="font-size: 0.875rem; color: var(--text-muted);">
+                        Select a parent board or choose "Top Level" to make this board independent.
+                    </p>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelMoveBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Move Board</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Image Modal -->
     <div class="modal" id="editImageModal" style="display: none;">
         <div class="modal-overlay"></div>
@@ -498,6 +532,9 @@
     <div class="context-menu" id="boardContextMenu" style="display: none;">
         <div class="context-menu-item" data-action="rename">
             ✏️ Rename
+        </div>
+        <div class="context-menu-item" data-action="move">
+            📁 Move to...
         </div>
         <div class="context-menu-item" data-action="merge">
             🔀 Merge into...
