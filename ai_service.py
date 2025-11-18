@@ -307,7 +307,10 @@ Format rules:
                     }
                 ],
                 "max_tokens": 500,
-                "temperature": 0.7
+                "temperature": 0.7,
+                "response_format": {  # Force JSON output if LM Studio supports it
+                    "type": "json_object"
+                }
             }
             
             logger.debug("Sending analysis request to %s", self.api_endpoint)
@@ -390,6 +393,15 @@ Format rules:
 
         if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
             json_str = text[start_idx : end_idx + 1]
+
+            # Aggressive cleanup: strip markdown code blocks even within extracted JSON
+            # This handles cases where model adds ```json``` between { and }
+            json_str = json_str.strip()
+            json_str = json_str.lstrip('`').rstrip('`')  # Remove backticks
+            if json_str.startswith('json'):
+                json_str = json_str[4:].lstrip()  # Remove 'json' marker
+            json_str = json_str.lstrip('`').rstrip('`')  # Remove remaining backticks
+
             try:
                 parsed = json.loads(json_str)
                 logger.debug("Successfully extracted JSON using find/rfind method")
@@ -506,81 +518,66 @@ Format rules:
             }
         """
         try:
-            # Prepare board information with hierarchy for the AI
-            def format_board_hierarchy(board, indent=0):
+            # Prepare simplified board list (flat, no verbose hierarchy)
+            def format_board_simple(board, indent=0):
+                # Simple format: ID: N, Name: 'X', Desc: 'Y' [Parent: Z]
                 prefix = "  " * indent
                 board_text = f"{prefix}ID: {board['id']}, Name: '{board['name']}'"
                 if board.get('description'):
-                    board_text += f", Description: '{board['description']}'"
+                    board_text += f", Desc: '{board['description'][:50]}...'" if len(board.get('description', '')) > 50 else f", Desc: '{board['description']}'"
                 if board.get('parent_id'):
-                    board_text += f" [Sub-board of ID: {board['parent_id']}]"
+                    board_text += f" [Parent: {board['parent_id']}]"
 
                 result = [board_text]
 
                 # Add sub-boards recursively
                 if board.get('sub_boards'):
                     for sub_board in board['sub_boards']:
-                        result.extend(format_board_hierarchy(sub_board, indent + 1))
+                        result.extend(format_board_simple(sub_board, indent + 1))
 
                 return result
 
             boards_info = []
             for board in existing_boards:
                 if not board.get('parent_id'):  # Only process top-level boards
-                    boards_info.extend(format_board_hierarchy(board))
+                    boards_info.extend(format_board_simple(board))
 
-            boards_context = "\n".join(boards_info) if boards_info else "No existing boards"
+            boards_context = "\n".join(boards_info) if boards_info else "No boards"
             tags_text = ", ".join(image_tags) if image_tags else "No tags"
 
-            # Create the prompt with hierarchy awareness
-            prompt = f"""You are helping organize a photo gallery. Based on an image's description and tags, suggest which board(s) it should be added to, or if a new board should be created.
+            # Simplified, direct prompt - minimal noise
+            prompt = f"""TASK: Assign image to existing board ID or propose new sub-board/top-level board.
 
-IMAGE INFORMATION:
+IMAGE DATA:
 Description: {image_description}
 Tags: {tags_text}
 
-EXISTING BOARDS (with hierarchy):
+EXISTING BOARDS (ID: Name):
 {boards_context}
 
-TASK:
-Analyze the image information and existing boards. Then decide:
-1. If the image fits well into one or more existing boards → suggest those boards
-2. If the image is a specific subcategory of an existing board → suggest creating a sub-board under that parent
-3. If no existing board is a good match → suggest creating a new top-level board
+RULES:
+1. PREFER creating SUB-BOARD if GENERAL category exists (e.g., Image=Tattoo, Board=Woman → New SUB-BOARD 'Tattoos' under Woman's ID).
+2. Use "create_new" for sub-board or new top-level board.
+3. Use "add_to_existing" ONLY if perfectly matches existing board.
+4. Confidence must be 0.0-1.0.
 
-IMPORTANT - HIERARCHY RULES:
-- If the image fits a GENERAL category that exists (e.g., "Women", "Nature", "Cars"), consider creating a SUB-BOARD for the SPECIFIC aspect (e.g., "Women with Tattoos" under "Women")
-- Example: If board "Women" exists and image shows "woman with tattoos" → create sub-board "Tattoos" with parent_id of "Women" board
-- Example: If board "Nature" exists and image shows "sunset over ocean" → create sub-board "Sunsets" under "Nature"
-- Only create top-level boards for entirely new categories
-
-You must respond with ONLY a valid JSON object in this exact format:
+REQUIRED OUTPUT FORMAT (RAW JSON ONLY):
 {{
   "action": "add_to_existing" or "create_new",
-  "suggested_boards": [1, 2, 3],
-  "confidence": 0.85,
+  "suggested_boards": [ID_1, ID_2],
+  "confidence": 0.0-1.0,
   "new_board": {{
-    "name": "New Board Name",
-    "description": "Description for the new board",
-    "parent_id": null or 123
-  }},
-  "reasoning": "Brief explanation of your suggestion"
+    "name": "Sub-Category Name",
+    "description": "Brief description",
+    "parent_id": 123 or null
+  }} or null,
+  "reasoning": "1-2 sentence explanation."
 }}
 
-RULES:
-- If action is "add_to_existing", include board IDs in suggested_boards array and set new_board to null
-- If action is "create_new", provide new_board details with parent_id (use parent board's ID if creating sub-board, or null for top-level)
-- Confidence should be 0.0 to 1.0 (0.8+ means very confident, 0.5-0.7 means moderate, below 0.5 means uncertain)
-- Keep reasoning brief (1-2 sentences)
-- Only suggest boards that are truly relevant
-- PREFER creating sub-boards when a general parent category exists
-- new_board.name should be the SUB-CATEGORY name only (e.g., "Tattoos" not "Women with Tattoos" if parent is "Women")
-
-CRITICAL INSTRUCTIONS:
-- Your ENTIRE response must be ONLY the JSON object
-- Do NOT add explanations before or after the JSON
-- Do NOT use markdown code blocks
-- Just the raw JSON object and nothing else"""
+CRITICAL:
+- Response MUST be RAW JSON ONLY.
+- NO explanations, NO markdown blocks (no ```json```).
+- Just the JSON object."""
 
             # Send request to LM Studio (text-only, no image needed)
             payload = {
@@ -592,7 +589,10 @@ CRITICAL INSTRUCTIONS:
                     }
                 ],
                 "max_tokens": 300,
-                "temperature": 0.5  # Lower temperature for more consistent suggestions
+                "temperature": 0.5,  # Lower temperature for more consistent suggestions
+                "response_format": {  # Force JSON output if LM Studio supports it
+                    "type": "json_object"
+                }
             }
 
             logger.debug("Requesting board suggestions from LM Studio...")
