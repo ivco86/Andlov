@@ -24,7 +24,10 @@ const state = {
     // Operation locks
     isScanning: false,
     isAnalyzing: false,
-    isUploading: false
+    isUploading: false,
+
+    // Sorting
+    imageSort: 'date-desc'
 };
 
 // Constants
@@ -593,7 +596,12 @@ async function saveImageEdit() {
 
         // Refresh current image and reload
         await loadImages();
-        await showImageDetail(imageId);
+        
+        // Reopen the image modal with updated data
+        const updatedImage = state.images.find(img => img.id === imageId);
+        if (updatedImage) {
+            await openImageModal(updatedImage);
+        }
 
         closeEditImageModal();
     } catch (error) {
@@ -850,7 +858,7 @@ function escapeHtml(text) {
 function renderImages() {
     const grid = document.getElementById('imageGrid');
     const emptyState = document.getElementById('emptyState');
-    
+
     if (state.images.length === 0) {
         grid.style.display = 'none';
         emptyState.style.display = 'flex';
@@ -860,7 +868,45 @@ function renderImages() {
     grid.style.display = 'block';
     emptyState.style.display = 'none';
 
-    grid.innerHTML = state.images.map(image => createImageCard(image)).join('');
+    // Sort images before rendering
+    const sortedImages = sortImages([...state.images], state.imageSort);
+
+    grid.innerHTML = sortedImages.map(image => createImageCard(image)).join('');
+}
+
+function sortImages(images, sortType) {
+    const sorted = [...images];
+
+    switch (sortType) {
+        case 'date-desc':
+            sorted.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateB - dateA; // Newest first
+            });
+            break;
+        case 'date-asc':
+            sorted.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateA - dateB; // Oldest first
+            });
+            break;
+        case 'name-asc':
+            sorted.sort((a, b) => a.filename.localeCompare(b.filename));
+            break;
+        case 'name-desc':
+            sorted.sort((a, b) => b.filename.localeCompare(a.filename));
+            break;
+        case 'size-desc':
+            sorted.sort((a, b) => (b.file_size || 0) - (a.file_size || 0));
+            break;
+        case 'size-asc':
+            sorted.sort((a, b) => (a.file_size || 0) - (b.file_size || 0));
+            break;
+    }
+
+    return sorted;
 }
 
 function createImageCard(image) {
@@ -922,15 +968,15 @@ function createImageCard(image) {
 function renderBoards() {
     const boardsList = document.getElementById('boardsList');
     const boardParentSelect = document.getElementById('boardParent');
-    
+
     if (state.boards.length === 0) {
         boardsList.innerHTML = '<li style="color: var(--text-muted); padding: var(--spacing-sm);">No boards yet</li>';
         boardParentSelect.innerHTML = '<option value="">-- Top Level --</option>';
         return;
     }
-    
+
     boardsList.innerHTML = state.boards.map(board => createBoardItem(board)).join('');
-    
+
     boardParentSelect.innerHTML = '<option value="">-- Top Level --</option>' +
         state.boards.map(board => createBoardOption(board)).join('');
 }
@@ -988,21 +1034,38 @@ function renderTagCloud() {
 }
 
 function createBoardItem(board, isSubBoard = false) {
-    const subBoardClass = isSubBoard ? 'sub-board' : '';
-    
+    const imageCount = board.image_count || 0;
+    const hasSubBoards = board.sub_boards && board.sub_boards.length > 0;
+
+    // Get gradient colors based on board name hash
+    const gradients = [
+        ['#ff006e', '#7b2cbf'],
+        ['#00f5d4', '#7b2cbf'],
+        ['#ff006e', '#00f5d4'],
+        ['#7b2cbf', '#ff006e'],
+        ['#c1121f', '#ff006e'],
+        ['#00f5d4', '#c1121f']
+    ];
+    const hash = board.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const [color1, color2] = gradients[hash % gradients.length];
+
     let html = `
-        <li>
-            <a href="#" class="nav-item ${subBoardClass}" data-board-id="${board.id}">
-                <span class="icon">📁</span>
-                <span>${escapeHtml(board.name)}</span>
-            </a>
-        </li>
+        <div class="board-pill ${hasSubBoards ? 'has-children' : ''}"
+             data-board-id="${board.id}"
+             data-has-children="${hasSubBoards}"
+             style="background: linear-gradient(135deg, ${color1}, ${color2});">
+            <span class="board-pill-name">${escapeHtml(board.name)}</span>
+            <span class="board-pill-count">${imageCount}</span>
+            ${hasSubBoards ? '<span class="board-pill-expand">▼</span>' : ''}
+        </div>
     `;
-    
-    if (board.sub_boards && board.sub_boards.length > 0) {
+
+    if (hasSubBoards) {
+        html += `<div class="board-sub-pills" data-parent-id="${board.id}" style="display: none;">`;
         html += board.sub_boards.map(sub => createBoardItem(sub, true)).join('');
+        html += `</div>`;
     }
-    
+
     return html;
 }
 
@@ -1562,24 +1625,74 @@ function attachEventListeners() {
         });
     }
     
-    // ✅ Boards List - Event delegation
+    // ✅ Boards List - Event delegation with single/double click
     const boardsList = document.getElementById('boardsList');
     if (boardsList) {
+        let clickTimer = null;
+        let clickPrevent = false;
+
         boardsList.addEventListener('click', (e) => {
-            const navItem = e.target.closest('.nav-item[data-board-id]');
-            if (navItem) {
-                e.preventDefault();
-                const boardId = parseInt(navItem.dataset.boardId);
-                switchView('board', boardId);
+            const boardPill = e.target.closest('.board-pill[data-board-id]');
+            if (!boardPill) return;
+
+            e.preventDefault();
+            const boardId = parseInt(boardPill.dataset.boardId);
+            const hasChildren = boardPill.dataset.hasChildren === 'true';
+
+            // Clear existing timer
+            clearTimeout(clickTimer);
+
+            // Prevent single click if double click is detected
+            if (clickPrevent) {
+                clickPrevent = false;
+                return;
             }
+
+            // Set timer for single click
+            clickTimer = setTimeout(() => {
+                // Single click - expand/collapse if has children
+                if (hasChildren) {
+                    const subPills = boardsList.querySelector(`.board-sub-pills[data-parent-id="${boardId}"]`);
+                    const expandIcon = boardPill.querySelector('.board-pill-expand');
+
+                    if (subPills) {
+                        const isExpanded = subPills.style.display !== 'none';
+                        subPills.style.display = isExpanded ? 'none' : 'flex';
+
+                        if (expandIcon) {
+                            expandIcon.textContent = isExpanded ? '▼' : '▲';
+                        }
+                    }
+                } else {
+                    // No children - open gallery
+                    switchView('board', boardId);
+                }
+            }, 250);
+        });
+
+        boardsList.addEventListener('dblclick', (e) => {
+            const boardPill = e.target.closest('.board-pill[data-board-id]');
+            if (!boardPill) return;
+
+            e.preventDefault();
+            clearTimeout(clickTimer);
+            clickPrevent = true;
+
+            const boardId = parseInt(boardPill.dataset.boardId);
+
+            // Double click - always open gallery
+            switchView('board', boardId);
+
+            // Reset prevent flag
+            setTimeout(() => { clickPrevent = false; }, 300);
         });
 
         // Right-click context menu on boards
         boardsList.addEventListener('contextmenu', (e) => {
-            const navItem = e.target.closest('.nav-item[data-board-id]');
-            if (navItem) {
+            const boardPill = e.target.closest('.board-pill[data-board-id]');
+            if (boardPill) {
                 e.preventDefault();
-                const boardId = parseInt(navItem.dataset.boardId);
+                const boardId = parseInt(boardPill.dataset.boardId);
                 showBoardContextMenu(boardId, e.pageX, e.pageY);
             }
         });
@@ -1977,6 +2090,56 @@ function attachEventListeners() {
             if (searchInput) searchInput.focus();
         }
     });
+
+    // Sorting Controls
+    const sortImagesBtn = document.getElementById('sortImagesBtn');
+    const imageSortMenu = document.getElementById('imageSortMenu');
+
+    // Image sorting
+    if (sortImagesBtn && imageSortMenu) {
+        sortImagesBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            imageSortMenu.style.display = imageSortMenu.style.display === 'none' ? 'block' : 'none';
+        });
+
+        imageSortMenu.addEventListener('click', (e) => {
+            const option = e.target.closest('.sort-option');
+            if (option) {
+                state.imageSort = option.dataset.sort;
+
+                // Update active state
+                imageSortMenu.querySelectorAll('.sort-option').forEach(opt => opt.classList.remove('active'));
+                option.classList.add('active');
+
+                renderImages();
+                imageSortMenu.style.display = 'none';
+                showToast('Images sorted!', 'success');
+            }
+        });
+    }
+
+    // Close sort menus on outside click
+    document.addEventListener('click', () => {
+        if (imageSortMenu) imageSortMenu.style.display = 'none';
+    });
+
+    // Duplicate Finder
+    const findDuplicatesBtn = document.getElementById('findDuplicatesBtn');
+    const duplicatesModal = document.getElementById('duplicatesModal');
+    const duplicatesClose = document.getElementById('duplicatesClose');
+    const duplicatesOverlay = document.getElementById('duplicatesOverlay');
+
+    if (findDuplicatesBtn) {
+        findDuplicatesBtn.addEventListener('click', findDuplicates);
+    }
+
+    if (duplicatesClose) {
+        duplicatesClose.addEventListener('click', closeDuplicatesModal);
+    }
+
+    if (duplicatesOverlay) {
+        duplicatesOverlay.addEventListener('click', closeDuplicatesModal);
+    }
 }
 
 // ============ Helper Functions ============
@@ -2661,6 +2824,145 @@ async function batchAddImagesToBoard() {
 
     // Open modal (reuse existing add to board modal)
     openAddToBoardModal(selectedIds[0], true); // true indicates batch mode
+}
+
+// ============ Duplicate Finder ============
+
+async function findDuplicates() {
+    const modal = document.getElementById('duplicatesModal');
+    const loading = document.getElementById('duplicatesLoading');
+    const content = document.getElementById('duplicatesContent');
+    const empty = document.getElementById('duplicatesEmpty');
+
+    // Show modal
+    if (modal) modal.style.display = 'block';
+    if (loading) loading.style.display = 'block';
+    if (content) content.innerHTML = '';
+    if (empty) empty.style.display = 'none';
+
+    try {
+        // Get all images from current view
+        const images = state.images;
+
+        if (images.length === 0) {
+            showToast('No images to analyze', 'warning');
+            closeDuplicatesModal();
+            return;
+        }
+
+        // Group images by file size (quick first pass)
+        const sizeGroups = new Map();
+        images.forEach(img => {
+            const size = img.file_size || 0;
+            if (!sizeGroups.has(size)) {
+                sizeGroups.set(size, []);
+            }
+            sizeGroups.get(size).push(img);
+        });
+
+        // Find potential duplicates (same size)
+        const duplicateGroups = [];
+        sizeGroups.forEach((group, size) => {
+            if (group.length > 1 && size > 0) {
+                // Further group by filename similarity
+                const nameGroups = new Map();
+                group.forEach(img => {
+                    // Extract base filename without extension and numbers
+                    const baseName = img.filename
+                        .replace(/\.[^.]+$/, '') // remove extension
+                        .replace(/[_\-\s]*\d+[_\-\s]*$/, '') // remove trailing numbers
+                        .toLowerCase();
+
+                    if (!nameGroups.has(baseName)) {
+                        nameGroups.set(baseName, []);
+                    }
+                    nameGroups.get(baseName).push(img);
+                });
+
+                nameGroups.forEach(nameGroup => {
+                    if (nameGroup.length > 1) {
+                        duplicateGroups.push(nameGroup);
+                    }
+                });
+            }
+        });
+
+        if (loading) loading.style.display = 'none';
+
+        if (duplicateGroups.length === 0) {
+            if (empty) empty.style.display = 'block';
+        } else {
+            if (content) {
+                content.innerHTML = `
+                    <p style="margin-bottom: var(--spacing-lg); color: var(--text-secondary);">
+                        Found ${duplicateGroups.length} group${duplicateGroups.length > 1 ? 's' : ''} of potential duplicates
+                    </p>
+                    ${duplicateGroups.map((group, index) => createDuplicateGroup(group, index)).join('')}
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('Error finding duplicates:', error);
+        showToast('Error analyzing duplicates', 'error');
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function createDuplicateGroup(images, groupIndex) {
+    return `
+        <div class="duplicate-group" style="margin-bottom: var(--spacing-xl);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                <h3 style="font-size: 16px; color: var(--text-primary);">
+                    Group ${groupIndex + 1}
+                    <span style="color: var(--text-secondary); font-size: 14px; font-weight: normal;">
+                        (${images.length} images, ${formatFileSize(images[0].file_size || 0)})
+                    </span>
+                </h3>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--spacing-md);">
+                ${images.map(img => createDuplicateCard(img)).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function createDuplicateCard(image) {
+    const isVideo = image.media_type === 'video';
+
+    return `
+        <div class="duplicate-card" style="position: relative; cursor: pointer;" onclick="openImageModal(state.images.find(img => img.id === ${image.id}))">
+            <div style="position: relative; aspect-ratio: 1; overflow: hidden; border-radius: var(--radius-md); background: var(--bg-tertiary);">
+                ${isVideo ?
+                    `<img
+                        src="/api/images/${image.id}/thumbnail?size=300"
+                        alt="${escapeHtml(image.filename)}"
+                        style="width: 100%; height: 100%; object-fit: cover;"
+                    >
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                        <div style="font-size: 20px;">▶</div>
+                    </div>` :
+                    `<img
+                        src="/api/images/${image.id}/thumbnail?size=300"
+                        alt="${escapeHtml(image.filename)}"
+                        style="width: 100%; height: 100%; object-fit: cover;"
+                    >`
+                }
+            </div>
+            <div style="padding: var(--spacing-sm); background: var(--bg-secondary); border-radius: 0 0 var(--radius-md) var(--radius-md);">
+                <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(image.filename)}">
+                    ${escapeHtml(image.filename)}
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary);">
+                    ${image.width || 0}×${image.height || 0}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function closeDuplicatesModal() {
+    const modal = document.getElementById('duplicatesModal');
+    if (modal) modal.style.display = 'none';
 }
 
 console.log('AI Gallery initialized ✨');
