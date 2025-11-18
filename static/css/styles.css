@@ -286,6 +286,10 @@ body {
     padding: var(--spacing-lg);
     overflow-y: auto;
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    align-self: flex-start;
 }
 
 .sidebar-section {
