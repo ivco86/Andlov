@@ -243,7 +243,76 @@ class Database:
             conn.commit()
         finally:
             conn.close()
-    
+
+    def update_image(self, image_id: int, description: str = None, tags: List[str] = None):
+        """Update image description and/or tags (manual edit, not AI analysis)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Get current values if we're not updating everything
+            if description is None or tags is None:
+                cursor.execute("SELECT description, tags FROM images WHERE id = ?", (image_id,))
+                current = cursor.fetchone()
+                if not current:
+                    raise ValueError(f"Image {image_id} not found")
+
+                if description is None:
+                    description = current['description']
+                if tags is None:
+                    # Parse existing tags from JSON
+                    tags = json.loads(current['tags']) if current['tags'] else []
+
+            # Convert tags to JSON and text
+            tags_json = json.dumps(tags) if tags else json.dumps([])
+            tags_text = ' '.join(tags) if tags else ''
+
+            # Update images table
+            cursor.execute("""
+                UPDATE images
+                SET description = ?, tags = ?, updated_at = ?
+                WHERE id = ?
+            """, (description, tags_json, datetime.now(), image_id))
+
+            # Update FTS index
+            cursor.execute("""
+                UPDATE images_fts
+                SET description = ?, tags = ?
+                WHERE rowid = ?
+            """, (description, tags_text, image_id))
+
+            conn.commit()
+        except sqlite3.DatabaseError as error:
+            conn.rollback()
+            if "malformed" in str(error).lower():
+                print("Detected corrupted full-text index during update, attempting rebuild...")
+                conn.close()
+                self.rebuild_fulltext_index()
+                # Retry with new connection
+                conn = self.get_connection()
+                cursor = conn.cursor()
+
+                tags_json = json.dumps(tags) if tags else json.dumps([])
+                tags_text = ' '.join(tags) if tags else ''
+
+                cursor.execute("""
+                    UPDATE images
+                    SET description = ?, tags = ?, updated_at = ?
+                    WHERE id = ?
+                """, (description, tags_json, datetime.now(), image_id))
+
+                cursor.execute("""
+                    UPDATE images_fts
+                    SET description = ?, tags = ?
+                    WHERE rowid = ?
+                """, (description, tags_text, image_id))
+
+                conn.commit()
+            else:
+                raise
+        finally:
+            conn.close()
+
     def toggle_favorite(self, image_id: int) -> bool:
         """Toggle favorite status, return new status"""
         conn = self.get_connection()

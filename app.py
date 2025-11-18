@@ -773,33 +773,12 @@ def update_image(image_id):
     tags = data.get('tags')
 
     try:
-        # Update description if provided
-        if description is not None:
-            db.cursor.execute(
-                'UPDATE images SET description = ? WHERE id = ?',
-                (description.strip() if description else None, image_id)
-            )
-
-        # Update tags if provided
-        if tags is not None:
-            # Remove existing tags
-            db.cursor.execute('DELETE FROM image_tags WHERE image_id = ?', (image_id,))
-
-            # Add new tags
-            if tags:
-                for tag in tags:
-                    if tag.strip():
-                        db.cursor.execute(
-                            '''INSERT OR IGNORE INTO tags (name) VALUES (?)''',
-                            (tag.strip(),)
-                        )
-                        db.cursor.execute(
-                            '''INSERT INTO image_tags (image_id, tag_id)
-                               SELECT ?, id FROM tags WHERE name = ?''',
-                            (image_id, tag.strip())
-                        )
-
-        db.conn.commit()
+        # Update using database method
+        db.update_image(
+            image_id=image_id,
+            description=description.strip() if description is not None and description else None,
+            tags=tags if tags is not None else None
+        )
 
         # Get updated image
         updated_image = db.get_image(image_id)
@@ -809,7 +788,7 @@ def update_image(image_id):
             'image': updated_image
         })
     except Exception as e:
-        db.conn.rollback()
+        logger.error("Error updating image %d: %s", image_id, str(e), exc_info=True)
         return jsonify({'error': f'Failed to update: {str(e)}'}), 500
 
 @app.route('/api/images/<int:image_id>/analyze', methods=['POST'])
