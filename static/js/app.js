@@ -738,9 +738,15 @@ async function saveImageEdit() {
 
         // Refresh current image and reload
         await loadImages();
-        await showImageDetail(imageId);
 
-        closeEditImageModal();
+        // Re-open image modal with updated data
+        const updatedImage = state.images.find(img => img.id === imageId);
+        if (updatedImage) {
+            closeEditImageModal();
+            await openImageModal(updatedImage);
+        } else {
+            closeEditImageModal();
+        }
     } catch (error) {
         showToast('Failed to update image: ' + error.message, 'error');
     }
