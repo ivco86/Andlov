@@ -1387,6 +1387,26 @@ def merge_board(board_id):
         print(f"Error merging boards: {e}")
         return jsonify({'error': f'Failed to merge boards: {str(e)}'}), 500
 
+@app.route('/api/boards/<int:board_id>/move', methods=['PUT'])
+def move_board(board_id):
+    """Move board to a new parent or to top level"""
+    data = request.json
+    new_parent_id = data.get('parent_id')  # None means move to top level
+
+    try:
+        db.move_board(board_id, new_parent_id)
+
+        return jsonify({
+            'success': True,
+            'board_id': board_id,
+            'new_parent_id': new_parent_id
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        print(f"Error moving board: {e}")
+        return jsonify({'error': f'Failed to move board: {str(e)}'}), 500
+
 @app.route('/api/boards/<int:board_id>/images', methods=['POST', 'DELETE'])
 def board_images(board_id):
     """Add or remove image from board"""

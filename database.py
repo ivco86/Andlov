@@ -571,7 +571,40 @@ class Database:
             conn.commit()
         
         conn.close()
-    
+
+    def move_board(self, board_id: int, new_parent_id: int = None):
+        """
+        Move board to a new parent (or to top level if new_parent_id is None)
+        Prevents circular dependencies
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Check if new_parent_id is the same as current board
+        if new_parent_id == board_id:
+            conn.close()
+            raise ValueError("Board cannot be its own parent")
+
+        # Check if new_parent_id would create a circular dependency
+        # (i.e., new parent is a descendant of the board being moved)
+        if new_parent_id is not None:
+            all_sub_boards = self._get_all_sub_boards(board_id, cursor)
+            sub_board_ids = [b['id'] for b in all_sub_boards]
+
+            if new_parent_id in sub_board_ids:
+                conn.close()
+                raise ValueError("Cannot move board under its own sub-board (circular dependency)")
+
+        # Update the parent_id
+        cursor.execute("""
+            UPDATE boards
+            SET parent_id = ?, updated_at = ?
+            WHERE id = ?
+        """, (new_parent_id, datetime.now(), board_id))
+
+        conn.commit()
+        conn.close()
+
     def delete_board(self, board_id: int, delete_sub_boards: bool = False):
         """
         Delete board and optionally its sub-boards

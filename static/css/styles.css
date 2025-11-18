@@ -591,6 +591,37 @@ body {
     transform: translateY(-1px);
 }
 
+.removable-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 4px;
+}
+
+.remove-tag-btn {
+    background: rgba(255, 0, 110, 0.3);
+    border: none;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+    transition: all var(--transition-fast);
+    font-weight: 700;
+}
+
+.remove-tag-btn:hover {
+    background: var(--accent-pink);
+    transform: scale(1.1);
+    box-shadow: 0 0 8px rgba(255, 0, 110, 0.6);
+}
+
 /* Status icon in top-right corner */
 .image-card-status-icon {
     position: absolute;

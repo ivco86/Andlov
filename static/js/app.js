@@ -766,6 +766,28 @@ async function mergeBoards(sourceBoardId, targetBoardId, deleteSource = true) {
     }
 }
 
+async function moveBoard(boardId, newParentId = null) {
+    try {
+        await apiCall(`/boards/${boardId}/move`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                parent_id: newParentId
+            })
+        });
+
+        const parentName = newParentId ? findBoardById(newParentId, state.boards)?.name : 'Top Level';
+        showToast(`Board moved to ${parentName} successfully!`, 'success');
+
+        await loadBoards();
+        renderBoards();
+
+        return true;
+    } catch (error) {
+        showToast('Failed to move board: ' + error.message, 'error');
+        return false;
+    }
+}
+
 async function getImageDetails(imageId) {
     try {
         const data = await apiCall(`/images/${imageId}`);
@@ -1160,7 +1182,12 @@ function updateModal() {
                     <h3>Boards</h3>
                     <div class="boards-container">
                         ${image.boards && image.boards.length > 0
-                            ? image.boards.map(board => `<span class="tag">${escapeHtml(board.name)}</span>`).join('')
+                            ? image.boards.map(board => `
+                                <span class="tag removable-tag" data-board-id="${board.id}">
+                                    ${escapeHtml(board.name)}
+                                    <button class="remove-tag-btn" data-board-id="${board.id}" title="Remove from board">×</button>
+                                </span>
+                            `).join('')
                             : '<div class="boards-placeholder">Not in any boards</div>'
                         }
                     </div>
@@ -1400,6 +1427,36 @@ function closeDeleteBoardModal() {
     });
 }
 
+function openMoveBoardModal(boardId) {
+    const board = findBoardById(boardId, state.boards);
+    if (!board) return;
+
+    currentBoardAction.boardId = boardId;
+    currentBoardAction.boardName = board.name;
+
+    document.getElementById('moveSourceName').textContent = board.name;
+
+    // Populate target parent dropdown (exclude the board itself and its sub-boards)
+    const targetSelect = document.getElementById('moveTargetParent');
+    const excludedIds = new Set([boardId, ...getAllSubBoardIds(boardId, state.boards)]);
+
+    const availableBoards = flattenBoards(state.boards).filter(b => !excludedIds.has(b.id));
+
+    targetSelect.innerHTML = '<option value="">-- Top Level (No Parent) --</option>' +
+        availableBoards.map(board =>
+            `<option value="${board.id}">${escapeHtml((board.prefix || '') + board.name)}</option>`
+        ).join('');
+
+    const modal = document.getElementById('moveBoardModal');
+    modal.style.display = 'block';
+}
+
+function closeMoveBoardModal() {
+    closeModal('moveBoardModal', () => {
+        currentBoardAction = { boardId: null, boardName: '' };
+    });
+}
+
 // Helper functions for board management
 function findBoardById(boardId, boards) {
     for (const board of boards) {
@@ -1598,6 +1655,8 @@ function attachEventListeners() {
 
                 if (action === 'rename') {
                     openRenameBoardModal(boardId);
+                } else if (action === 'move') {
+                    openMoveBoardModal(boardId);
                 } else if (action === 'merge') {
                     openMergeBoardModal(boardId);
                 } else if (action === 'delete') {
@@ -1679,12 +1738,66 @@ function attachEventListeners() {
             }
         });
     }
-    
+
+    // Move Board Modal
+    const moveBoardClose = document.getElementById('moveBoardClose');
+    const cancelMoveBtn = document.getElementById('cancelMoveBtn');
+    const moveBoardForm = document.getElementById('moveBoardForm');
+
+    if (moveBoardClose) moveBoardClose.addEventListener('click', closeMoveBoardModal);
+    if (cancelMoveBtn) cancelMoveBtn.addEventListener('click', closeMoveBoardModal);
+
+    if (moveBoardForm) {
+        moveBoardForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const newParentId = document.getElementById('moveTargetParent').value || null;
+
+            if (currentBoardAction.boardId) {
+                const success = await moveBoard(currentBoardAction.boardId, newParentId);
+                if (success) {
+                    closeMoveBoardModal();
+                }
+            }
+        });
+    }
+
     // Image Modal
     const modalClose = document.getElementById('modalClose');
     const modalOverlay = document.getElementById('modalOverlay');
     if (modalClose) modalClose.addEventListener('click', closeImageModal);
     if (modalOverlay) modalOverlay.addEventListener('click', closeImageModal);
+
+    // Remove image from board (event delegation for dynamically created buttons)
+    document.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('remove-tag-btn') && e.target.dataset.boardId) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const boardId = parseInt(e.target.dataset.boardId);
+            if (state.currentImage && boardId) {
+                const board = findBoardById(boardId, state.boards);
+                if (board && confirm(`Remove this image from "${board.name}"?`)) {
+                    const success = await removeImageFromBoard(boardId, state.currentImage.id);
+                    if (success) {
+                        showToast(`Removed from ${board.name}`, 'success');
+
+                        // Reload image details and update modal
+                        const updated = await getImageDetails(state.currentImage.id);
+                        if (updated) {
+                            state.currentImage = updated;
+                            updateModal();
+                        }
+
+                        // Refresh board view if currently viewing this board
+                        if (state.currentBoard && state.currentBoard.id === boardId) {
+                            loadBoard(boardId);
+                        }
+                    }
+                }
+            }
+        }
+    });
 
     // Edit Image Modal
     const editImageClose = document.getElementById('editImageClose');
