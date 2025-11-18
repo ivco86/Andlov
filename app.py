@@ -769,37 +769,16 @@ def update_image(image_id):
     if not image:
         return jsonify({'error': 'Image not found'}), 404
 
-    description = data.get('description')
-    tags = data.get('tags')
+    description = data.get('description', '')
+    tags = data.get('tags', [])
 
     try:
-        # Update description if provided
-        if description is not None:
-            db.cursor.execute(
-                'UPDATE images SET description = ? WHERE id = ?',
-                (description.strip() if description else None, image_id)
-            )
+        # Use the database method to update image analysis
+        # Clean up tags - remove empty strings
+        clean_tags = [tag.strip() for tag in tags if tag and tag.strip()]
 
-        # Update tags if provided
-        if tags is not None:
-            # Remove existing tags
-            db.cursor.execute('DELETE FROM image_tags WHERE image_id = ?', (image_id,))
-
-            # Add new tags
-            if tags:
-                for tag in tags:
-                    if tag.strip():
-                        db.cursor.execute(
-                            '''INSERT OR IGNORE INTO tags (name) VALUES (?)''',
-                            (tag.strip(),)
-                        )
-                        db.cursor.execute(
-                            '''INSERT INTO image_tags (image_id, tag_id)
-                               SELECT ?, id FROM tags WHERE name = ?''',
-                            (image_id, tag.strip())
-                        )
-
-        db.conn.commit()
+        # Update using the proper database method
+        db.update_image_analysis(image_id, description, clean_tags)
 
         # Get updated image
         updated_image = db.get_image(image_id)
@@ -809,7 +788,6 @@ def update_image(image_id):
             'image': updated_image
         })
     except Exception as e:
-        db.conn.rollback()
         return jsonify({'error': f'Failed to update: {str(e)}'}), 500
 
 @app.route('/api/images/<int:image_id>/analyze', methods=['POST'])

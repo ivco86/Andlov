@@ -1029,8 +1029,8 @@ function renderTagCloud() {
 }
 
 function createBoardItem(board, isSubBoard = false) {
-    const subBoardClass = isSubBoard ? 'sub-board' : '';
     const imageCount = board.image_count || 0;
+    const hasSubBoards = board.sub_boards && board.sub_boards.length > 0;
 
     // Get gradient colors based on board name hash
     const gradients = [
@@ -1045,29 +1045,20 @@ function createBoardItem(board, isSubBoard = false) {
     const [color1, color2] = gradients[hash % gradients.length];
 
     let html = `
-        <li class="board-card-wrapper ${subBoardClass}">
-            <div class="board-card" data-board-id="${board.id}">
-                <div class="board-card-bg" style="background: linear-gradient(135deg, ${color1}, ${color2});"></div>
-                <div class="board-card-content">
-                    <div class="board-card-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7" rx="1"/>
-                            <rect x="14" y="3" width="7" height="7" rx="1"/>
-                            <rect x="14" y="14" width="7" height="7" rx="1"/>
-                            <rect x="3" y="14" width="7" height="7" rx="1"/>
-                        </svg>
-                    </div>
-                    <div class="board-card-info">
-                        <div class="board-card-name">${escapeHtml(board.name)}</div>
-                        <div class="board-card-count">${imageCount} ${imageCount === 1 ? 'image' : 'images'}</div>
-                    </div>
-                </div>
-            </div>
-        </li>
+        <div class="board-pill ${hasSubBoards ? 'has-children' : ''}"
+             data-board-id="${board.id}"
+             data-has-children="${hasSubBoards}"
+             style="background: linear-gradient(135deg, ${color1}, ${color2});">
+            <span class="board-pill-name">${escapeHtml(board.name)}</span>
+            <span class="board-pill-count">${imageCount}</span>
+            ${hasSubBoards ? '<span class="board-pill-expand">▼</span>' : ''}
+        </div>
     `;
 
-    if (board.sub_boards && board.sub_boards.length > 0) {
+    if (hasSubBoards) {
+        html += `<div class="board-sub-pills" data-parent-id="${board.id}" style="display: none;">`;
         html += board.sub_boards.map(sub => createBoardItem(sub, true)).join('');
+        html += `</div>`;
     }
 
     return html;
@@ -1629,24 +1620,74 @@ function attachEventListeners() {
         });
     }
     
-    // ✅ Boards List - Event delegation
+    // ✅ Boards List - Event delegation with single/double click
     const boardsList = document.getElementById('boardsList');
     if (boardsList) {
+        let clickTimer = null;
+        let clickPrevent = false;
+
         boardsList.addEventListener('click', (e) => {
-            const boardCard = e.target.closest('.board-card[data-board-id]');
-            if (boardCard) {
-                e.preventDefault();
-                const boardId = parseInt(boardCard.dataset.boardId);
-                switchView('board', boardId);
+            const boardPill = e.target.closest('.board-pill[data-board-id]');
+            if (!boardPill) return;
+
+            e.preventDefault();
+            const boardId = parseInt(boardPill.dataset.boardId);
+            const hasChildren = boardPill.dataset.hasChildren === 'true';
+
+            // Clear existing timer
+            clearTimeout(clickTimer);
+
+            // Prevent single click if double click is detected
+            if (clickPrevent) {
+                clickPrevent = false;
+                return;
             }
+
+            // Set timer for single click
+            clickTimer = setTimeout(() => {
+                // Single click - expand/collapse if has children
+                if (hasChildren) {
+                    const subPills = boardsList.querySelector(`.board-sub-pills[data-parent-id="${boardId}"]`);
+                    const expandIcon = boardPill.querySelector('.board-pill-expand');
+
+                    if (subPills) {
+                        const isExpanded = subPills.style.display !== 'none';
+                        subPills.style.display = isExpanded ? 'none' : 'flex';
+
+                        if (expandIcon) {
+                            expandIcon.textContent = isExpanded ? '▼' : '▲';
+                        }
+                    }
+                } else {
+                    // No children - open gallery
+                    switchView('board', boardId);
+                }
+            }, 250);
+        });
+
+        boardsList.addEventListener('dblclick', (e) => {
+            const boardPill = e.target.closest('.board-pill[data-board-id]');
+            if (!boardPill) return;
+
+            e.preventDefault();
+            clearTimeout(clickTimer);
+            clickPrevent = true;
+
+            const boardId = parseInt(boardPill.dataset.boardId);
+
+            // Double click - always open gallery
+            switchView('board', boardId);
+
+            // Reset prevent flag
+            setTimeout(() => { clickPrevent = false; }, 300);
         });
 
         // Right-click context menu on boards
         boardsList.addEventListener('contextmenu', (e) => {
-            const boardCard = e.target.closest('.board-card[data-board-id]');
-            if (boardCard) {
+            const boardPill = e.target.closest('.board-pill[data-board-id]');
+            if (boardPill) {
                 e.preventDefault();
-                const boardId = parseInt(boardCard.dataset.boardId);
+                const boardId = parseInt(boardPill.dataset.boardId);
                 showBoardContextMenu(boardId, e.pageX, e.pageY);
             }
         });
