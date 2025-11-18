@@ -278,18 +278,18 @@ body {
 /* ============ Sidebar ============ */
 
 .sidebar {
+    min-width: 260px;
     width: 260px;
+    max-width: 500px;
     background: rgba(26, 31, 46, 0.8);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-right: 1px solid var(--border-color);
+    border-right: 3px solid var(--border-color);
     padding: var(--spacing-lg);
     overflow-y: auto;
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
-    max-height: 100vh;
-    align-self: flex-start;
+    resize: horizontal;
+    position: relative;
 }
 
 .sidebar-section {
@@ -1421,6 +1421,12 @@ body {
     z-index: 10000;
     min-width: 180px;
     overflow: hidden;
+}
+
+#imageSortMenu {
+    position: absolute;
+    top: 60px;
+    right: 20px;
 }
 
 .context-menu-item {

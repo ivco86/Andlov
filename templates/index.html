@@ -29,6 +29,8 @@
         <div class="header-right">
             <button class="btn btn-primary" id="uploadBtn" aria-label="Upload images from your computer">📤 Upload</button>
             <button class="btn btn-primary" id="scanBtn" aria-label="Scan photos directory for new images">📂 Scan</button>
+            <button class="btn btn-secondary" id="sortImagesBtn" aria-label="Sort images">🔄 Sort</button>
+            <button class="btn btn-secondary" id="findDuplicatesBtn" aria-label="Find duplicate images">🔍 Find Duplicates</button>
             <button class="btn btn-secondary" id="analyzeBtn" aria-label="Analyze multiple images with AI">🤖 Analyze</button>
             <button class="btn btn-secondary" id="selectBtn" aria-label="Select multiple images">✓ Select</button>
             <button class="btn btn-secondary" id="settingsBtn" aria-label="Open settings">⚙️ Settings</button>
@@ -523,6 +525,43 @@
 
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Image Sort Menu -->
+    <div class="context-menu" id="imageSortMenu" style="display: none;">
+        <div class="context-menu-item sort-option active" data-sort="date-desc">
+            📅 Newest First
+        </div>
+        <div class="context-menu-item sort-option" data-sort="date-asc">
+            📅 Oldest First
+        </div>
+        <div class="context-menu-item sort-option" data-sort="name-asc">
+            🔤 Name A-Z
+        </div>
+        <div class="context-menu-item sort-option" data-sort="name-desc">
+            🔤 Name Z-A
+        </div>
+        <div class="context-menu-item sort-option" data-sort="size-desc">
+            📏 Largest First
+        </div>
+        <div class="context-menu-item sort-option" data-sort="size-asc">
+            📏 Smallest First
+        </div>
+    </div>
+
+    <!-- Duplicates Modal -->
+    <div class="modal" id="duplicatesModal" style="display: none;">
+        <div class="modal-overlay" id="duplicatesOverlay"></div>
+        <div class="modal-content" style="max-width: 90vw;">
+            <button class="modal-close" id="duplicatesClose" aria-label="Close duplicates finder">&times;</button>
+
+            <div class="modal-body" id="duplicatesBody">
+                <h2>🔍 Duplicate Images</h2>
+                <div id="duplicatesContent">
+                    <!-- Duplicate groups will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/js/app.js"></script>
 </body>
